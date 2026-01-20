@@ -13,6 +13,19 @@ interface Proposal {
     updated_at: string;
 }
 
+const MOCK_PROPOSALS: Proposal[] = [
+    {
+        id: 'mock-1',
+        title: '[목업] 2024년도 AI 바우처 지원사업 제안서',
+        updated_at: new Date().toISOString(),
+    },
+    {
+        id: 'mock-2',
+        title: '[목업] 공공 클라우드 전환 컨설팅 사업 제안서',
+        updated_at: new Date(Date.now() - 86400000).toISOString(),
+    },
+];
+
 const fetchProposals = async () => {
     const { data } = await axios.get<Proposal[]>('/api/proposals');
     return data;
@@ -45,18 +58,12 @@ export default function DashboardPage() {
         mutation.mutate();
     };
 
+    const displayProposals = error ? MOCK_PROPOSALS : proposals;
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="p-4 bg-red-50 text-red-600 rounded-lg">
-                데이터를 불러오는데 실패했습니다.
             </div>
         );
     }
@@ -75,7 +82,7 @@ export default function DashboardPage() {
                 </button>
             </div>
 
-            {(!proposals || proposals.length === 0) ? (
+            {(!displayProposals || displayProposals.length === 0) ? (
                 <div className="text-center py-20 bg-white rounded-xl border border-gray-100 shadow-sm">
                     <div className="bg-blue-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                         <FileText className="w-8 h-8 text-blue-600" />
@@ -92,7 +99,12 @@ export default function DashboardPage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {proposals.map((proposal) => (
+                    {error && (
+                        <div className="col-span-full mb-2 p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm flex items-center gap-2">
+                            데이터를 불러오는데 실패하여 목업 데이터를 표시합니다.
+                        </div>
+                    )}
+                    {displayProposals.map((proposal) => (
                         <Link
                             key={proposal.id}
                             href={`/editor/${proposal.id}`}
