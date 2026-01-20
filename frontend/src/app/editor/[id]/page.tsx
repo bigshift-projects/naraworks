@@ -1,0 +1,176 @@
+'use client';
+
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from '@/lib/axios';
+import { useState, useEffect, useCallback } from 'react';
+import Editor from '@/components/Editor';
+import { ChevronLeft, Loader2, Save, Download, Check } from 'lucide-react';
+import Link from 'next/link';
+
+interface Proposal {
+    id: string;
+    title: string;
+    content: string;
+    updated_at: string;
+}
+
+const fetchProposal = async (id: string) => {
+    const { data } = await axios.get<Proposal>(`/api/proposals/${id}`);
+    return data;
+};
+
+const updateProposal = async ({ id, title, content }: { id: string; title?: string; content?: string }) => {
+    const { data } = await axios.put(`/api/proposals/${id}`, { title, content });
+    return data;
+};
+
+export default function EditorPage() {
+    const { id } = useParams() as { id: string };
+    const queryClient = useQueryClient();
+    const router = useRouter();
+
+    const [title, setTitle] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+    const { data: proposal, isLoading, error } = useQuery({
+        queryKey: ['proposal', id],
+        queryFn: () => fetchProposal(id),
+    });
+
+    const mutation = useMutation({
+        mutationFn: updateProposal,
+        onSuccess: () => {
+            setLastSaved(new Date());
+            setIsSaving(false);
+        },
+    });
+
+    useEffect(() => {
+        if (proposal) {
+            setTitle(proposal.title);
+        }
+    }, [proposal]);
+
+    // Debounced autosave
+    useEffect(() => {
+        if (!proposal) return;
+
+        const timeoutId = setTimeout(() => {
+            if (mutation.isPending) return;
+            setIsSaving(true);
+            mutation.mutate({ id, title, content: undefined }); // Only title for now if changed via input
+        }, 2000);
+
+        return () => clearTimeout(timeoutId);
+    }, [title]);
+
+    const handleContentChange = useCallback((content: string) => {
+        if (!proposal) return;
+
+        setIsSaving(true);
+        // Debounce handled by external logic or simple timeout here for content
+        const timeoutId = setTimeout(() => {
+            mutation.mutate({ id, content });
+        }, 1500);
+
+        return () => clearTimeout(timeoutId);
+    }, [id, proposal, mutation]);
+
+    const handleExportPDF = () => {
+        window.print();
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-gray-50">
+                <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-gray-50">
+                <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-200">
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">Proposal not found</h2>
+                    <Link href="/dashboard" className="text-blue-600 hover:underline">Return to Dashboard</Link>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+            {/* Editor Header */}
+            <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 no-print">
+                <div className="flex items-center gap-4 flex-1">
+                    <Link href="/dashboard" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                        <ChevronLeft className="w-5 h-5 text-gray-600" />
+                    </Link>
+                    <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="text-xl font-semibold text-gray-900 bg-transparent border-none focus:outline-none focus:ring-0 w-full max-w-2xl"
+                        placeholder="제안서 제목을 입력하세요"
+                    />
+                </div>
+
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mr-4">
+                        {isSaving ? (
+                            <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <span>저장 중...</span>
+                            </>
+                        ) : lastSaved ? (
+                            <>
+                                <Check className="w-3 h-3 text-green-500" />
+                                <span>마지막 저장: {lastSaved.toLocaleTimeString()}</span>
+                            </>
+                        ) : (
+                            <span>저장됨</span>
+                        )}
+                    </div>
+
+                    <button
+                        onClick={handleExportPDF}
+                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
+                        <Download className="w-4 h-4" />
+                        PDF 내보내기
+                    </button>
+                </div>
+            </header>
+
+            {/* Editor Content Area */}
+            <main className="flex-1 p-8 md:p-12 max-w-5xl mx-auto w-full">
+                <Editor
+                    initialContent={proposal?.content}
+                    onChange={handleContentChange}
+                />
+            </main>
+
+            <style jsx global>{`
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+          body {
+            background-color: white !important;
+          }
+          main {
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: none !important;
+          }
+          .prose {
+            max-width: none !important;
+          }
+        }
+      `}</style>
+        </div>
+    );
+}
