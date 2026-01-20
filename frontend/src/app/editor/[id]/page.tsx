@@ -15,12 +15,46 @@ interface Proposal {
     updated_at: string;
 }
 
+const MOCK_PROPOSAL_DETAILS: Record<string, Proposal> = {
+    'mock-1': {
+        id: 'mock-1',
+        title: '[목업] 2024년도 AI 바우처 지원사업 제안서',
+        content: `
+<h1>2024년도 AI 바우처 지원사업 제안서</h1>
+<p>이것은 서버 에러 시 표시되는 <strong>목업 데이터</strong>입니다.</p>
+<h2>1. 사업 개요</h2>
+<p>본 사업은 중소기업의 AI 도입을 지원하기 위한 바우처 사업입니다.</p>
+<h2>2. 수행 계획</h2>
+<p>최신 LLM 기술을 활용하여 업무 자동화를 실현합니다.</p>
+        `,
+        updated_at: new Date().toISOString(),
+    },
+    'mock-2': {
+        id: 'mock-2',
+        title: '[목업] 공공 클라우드 전환 컨설팅 사업 제안서',
+        content: `
+<h1>공공 클라우드 전환 컨설팅 사업 제안서</h1>
+<p>공공 부문의 안정적인 클라우드 전환을 위한 컨설팅을 제공합니다.</p>
+        `,
+        updated_at: new Date(Date.now() - 86400000).toISOString(),
+    },
+};
+
 const fetchProposal = async (id: string) => {
+    if (id.startsWith('mock-')) {
+        const mock = MOCK_PROPOSAL_DETAILS[id];
+        if (mock) return mock;
+        throw new Error('Mock proposal not found');
+    }
     const { data } = await axios.get<Proposal>(`/api/proposals/${id}`);
     return data;
 };
 
 const updateProposal = async ({ id, title, content }: { id: string; title?: string; content?: string }) => {
+    if (id.startsWith('mock-')) {
+        // Mock update - just return success
+        return { success: true };
+    }
     const { data } = await axios.put(`/api/proposals/${id}`, { title, content });
     return data;
 };

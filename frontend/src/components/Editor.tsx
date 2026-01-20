@@ -19,6 +19,7 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
             }),
         ],
         content: initialContent,
+        immediatelyRender: false,
         onUpdate: ({ editor }) => {
             onChange(editor.getHTML());
         },
