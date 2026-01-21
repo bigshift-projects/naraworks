@@ -255,7 +255,7 @@ export default function DashboardPage() {
                             </h3>
                             <div className="space-y-1">
                                 <p className="text-sm text-gray-500">
-                                    {format(new Date(proposal.created_at), 'yyyy.MM.dd')} 생성
+                                    {format(new Date(proposal.created_at), 'yyyy.MM.dd HH:mm')} 생성
                                 </p>
                                 <p className="text-xs text-gray-400">
                                     {formatDistanceToNow(new Date(proposal.updated_at), { addSuffix: true })} 수정됨

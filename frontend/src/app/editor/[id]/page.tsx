@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from '@/lib/axios';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Editor from '@/components/Editor';
-import { ChevronLeft, Loader2, Save, Download, Check } from 'lucide-react';
+import { ChevronLeft, Loader2, Save, Download, Check, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 interface Proposal {
@@ -147,6 +147,31 @@ export default function EditorPage() {
         }
     };
 
+    const handleGenerateTOCFromRFP = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || !e.target.files[0]) return;
+
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append('rfp', file);
+
+        try {
+            alert('RFP 분석 중입니다. 잠시만 기다려주세요...');
+            const res = await axios.post('/api/proposals/parse-rfp', formData);
+
+            if (res.data.toc && res.data.toc.length > 0) {
+                const newToc = res.data.toc.map((item: any) => ({ ...item, status: 'pending' }));
+                setToc(newToc);
+                // Save immediately
+                mutation.mutate({ id, title, content, toc: newToc, status: 'toc_confirmed' });
+            } else {
+                alert('목차 생성에 실패했습니다. PDF에 텍스트가 포함되어 있는지 확인해주세요.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('목차 생성 중 오류가 발생했습니다.');
+        }
+    };
+
     const handleGenerateSection = async (index: number) => {
         const section = toc[index];
         if (!section) return;
@@ -280,7 +305,28 @@ export default function EditorPage() {
                             </div>
                         ))}
                         {toc.length === 0 && (
-                            <p className="text-sm text-gray-400 italic">목차가 없습니다. RFP를 분석하여 목차를 생성해보세요.</p>
+                            <div className="text-center py-8">
+                                <p className="text-sm text-gray-400 italic mb-4">목차가 없습니다.</p>
+
+                                <input
+                                    type="file"
+                                    id="sidebar-rfp-upload"
+                                    className="hidden"
+                                    accept=".pdf"
+                                    onChange={handleGenerateTOCFromRFP}
+                                />
+                                <label
+                                    htmlFor="sidebar-rfp-upload"
+                                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100 cursor-pointer transition-colors"
+                                >
+                                    <FileText className="w-3 h-3" />
+                                    RFP로 목차 생성하기
+                                </label>
+
+                                <p className="text-xs text-gray-300 mt-2">
+                                    또는 수동으로 작성하세요 (준비중)
+                                </p>
+                            </div>
                         )}
                     </div>
                 </aside>

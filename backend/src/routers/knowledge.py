@@ -16,6 +16,10 @@ class KnowledgeItem(BaseModel):
     content_preview: str
     created_at: str
 
+class CreateKnowledgeText(BaseModel):
+    title: str
+    content: str
+
 @router.post(
     "/upload", 
     summary="Upload knowledge base document",
@@ -54,6 +58,27 @@ async def upload_knowledge(file: UploadFile = File(...)):
         return response.data[0] if isinstance(response.data, list) and len(response.data) > 0 else response.data
     except Exception as e:
         print(f"DB Error (Knowledge Upload): {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post(
+    "/text",
+    summary="Add text to knowledge base",
+    description="Add raw text content directly to the knowledge base."
+)
+async def add_knowledge_text(item: CreateKnowledgeText):
+    if not supabase:
+        return {"message": "DB disconnected, mocked text add", "title": item.title}
+
+    try:
+        data = {
+            "filename": item.title, # Use title as filename
+            "content": item.content,
+            "created_at": datetime.now().isoformat()
+        }
+        response = supabase.table("naraworks_knowledge").insert(data).execute()
+        return response.data[0] if isinstance(response.data, list) and len(response.data) > 0 else response.data
+    except Exception as e:
+        print(f"DB Error (Knowledge Text Add): {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get(

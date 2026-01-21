@@ -87,31 +87,45 @@ export default function NewProposalPage() {
                 <p className="text-gray-500 mb-10">RFP를 분석하여 제안서 목차를 자동으로 생성합니다.</p>
 
                 {step === 'upload' && (
-                    <div className="flex flex-col items-center justify-center h-96 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                        <input
-                            type="file"
-                            accept=".pdf"
-                            onChange={handleFileChange}
-                            className="hidden"
-                            id="file-upload"
-                        />
-                        <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
-                            <span className="text-6xl mb-4">📄</span>
-                            <span className="text-lg font-medium text-gray-700">
-                                {file ? file.name : "RFP(제안요청서) PDF 파일을 업로드하세요"}
-                            </span>
-                            <span className="text-sm text-gray-400 mt-2">클릭하여 파일 선택</span>
-                        </label>
+                    <>
+                        <div className="flex flex-col items-center justify-center h-96 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <input
+                                type="file"
+                                accept=".pdf"
+                                onChange={handleFileChange}
+                                className="hidden"
+                                id="file-upload"
+                            />
+                            <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
+                                <span className="text-6xl mb-4">📄</span>
+                                <span className="text-lg font-medium text-gray-700">
+                                    {file ? file.name : "RFP(제안요청서) PDF 파일을 업로드하세요"}
+                                </span>
+                                <span className="text-sm text-gray-400 mt-2">클릭하여 파일 선택</span>
+                            </label>
 
-                        {file && (
+                            {file && (
+                                <button
+                                    onClick={handleParse}
+                                    className="mt-8 px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                                >
+                                    RFP 분석 및 목차 생성
+                                </button>
+                            )}
+                        </div>
+                        <div className="mt-6 flex justify-center">
                             <button
-                                onClick={handleParse}
-                                className="mt-8 px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                                onClick={() => {
+                                    setToc([]);
+                                    setTitle("새 제안서");
+                                    handleCreate();
+                                }}
+                                className="text-gray-500 hover:text-gray-700 text-sm underline"
                             >
-                                RFP 분석 및 목차 생성
+                                건너뛰고 빈 제안서 생성하기
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    </>
                 )}
 
                 {step === 'parsing' && (

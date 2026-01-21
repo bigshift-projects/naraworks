@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileText, Settings, LayoutDashboard } from 'lucide-react';
+import { FileText, Settings, LayoutDashboard, BookOpen } from 'lucide-react';
 
 export default function DashboardLayout({
     children,
@@ -20,6 +20,10 @@ export default function DashboardLayout({
                     <Link href="/dashboard" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors">
                         <LayoutDashboard className="w-5 h-5" />
                         <span className="font-medium">Dashboard</span>
+                    </Link>
+                    <Link href="/knowledge" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors">
+                        <BookOpen className="w-5 h-5" />
+                        <span className="font-medium">Knowledge</span>
                     </Link>
                     <button className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-left">
                         <Settings className="w-5 h-5" />
