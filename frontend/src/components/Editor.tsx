@@ -6,11 +6,12 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { useEffect } from 'react';
 
 interface EditorProps {
+    id?: string;
     initialContent?: string;
     onChange: (content: string) => void;
 }
 
-const Editor = ({ initialContent, onChange }: EditorProps) => {
+const Editor = ({ id, initialContent, onChange }: EditorProps) => {
     const editor = useEditor({
         extensions: [
             StarterKit,
@@ -42,7 +43,7 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
     }
 
     return (
-        <div className="w-full bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div id={id} className="w-full bg-white border border-gray-200 rounded-lg shadow-sm">
             <div className="border-b border-gray-200 p-2 flex flex-wrap gap-1 bg-gray-50 rounded-t-lg no-print">
                 <button
                     onClick={() => editor.chain().focus().toggleBold().run()}

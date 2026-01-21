@@ -21,6 +21,11 @@ out/
 .env.*
 !.env.example
 
+# Python virtual environment
+venv/
+.venv/
+env/
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

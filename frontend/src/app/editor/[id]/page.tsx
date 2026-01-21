@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from '@/lib/axios';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Editor from '@/components/Editor';
 import { ChevronLeft, Loader2, Save, Download, Check } from 'lucide-react';
 import Link from 'next/link';
@@ -67,6 +67,7 @@ export default function EditorPage() {
     const [title, setTitle] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const { data: proposal, isLoading, error } = useQuery({
         queryKey: ['proposal', id],
@@ -87,15 +88,15 @@ export default function EditorPage() {
         }
     }, [proposal]);
 
-    // Debounced autosave
+    // Debounced autosave for title
     useEffect(() => {
         if (!proposal) return;
 
         const timeoutId = setTimeout(() => {
             if (mutation.isPending) return;
             setIsSaving(true);
-            mutation.mutate({ id, title, content: undefined }); // Only title for now if changed via input
-        }, 2000);
+            mutation.mutate({ id, title, content: undefined });
+        }, 10000); // Changed from 2000 to 10000
 
         return () => clearTimeout(timeoutId);
     }, [title]);
@@ -104,16 +105,61 @@ export default function EditorPage() {
         if (!proposal) return;
 
         setIsSaving(true);
-        // Debounce handled by external logic or simple timeout here for content
-        const timeoutId = setTimeout(() => {
-            mutation.mutate({ id, content });
-        }, 1500);
 
-        return () => clearTimeout(timeoutId);
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        saveTimeoutRef.current = setTimeout(() => {
+            mutation.mutate({ id, content });
+        }, 10000); // Changed from 1500 to 10000
     }, [id, proposal, mutation]);
 
-    const handleExportPDF = () => {
-        window.print();
+    const handleExportPDF = async () => {
+        const element = document.getElementById('proposal-content');
+        if (!element) return;
+
+        try {
+            setIsSaving(true);
+            const { toPng } = await import('html-to-image');
+            const { jsPDF } = await import('jspdf');
+
+            // Capture at a standardized width (e.g., 800px) to maintain a consistent A4-like layout
+            const dataUrl = await toPng(element, {
+                quality: 1.0,
+                backgroundColor: '#ffffff',
+                width: 800,
+                style: {
+                    border: 'none',
+                    boxShadow: 'none',
+                    borderRadius: '0',
+                    margin: '0',
+                    width: '800px',
+                },
+                filter: (node) => {
+                    return !(node instanceof Element && node.classList.contains('no-print'));
+                }
+            });
+
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+
+            const imgProps = pdf.getImageProperties(dataUrl);
+            const ratio = imgProps.height / imgProps.width;
+            const imgWidth = pdfWidth;
+            const imgHeight = pdfWidth * ratio;
+
+            // Simple handling for multi-page if height exceeds single A4
+            // For now, it will scale to fit width. 
+            pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
+            pdf.save(`${title || '제안서'}.pdf`);
+        } catch (error) {
+            console.error('PDF Export failed:', error);
+            alert('PDF 생성 중 오류가 발생했습니다.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (isLoading) {
@@ -182,6 +228,7 @@ export default function EditorPage() {
             {/* Editor Content Area */}
             <main className="flex-1 p-8 md:p-12 max-w-5xl mx-auto w-full">
                 <Editor
+                    id="proposal-content"
                     initialContent={proposal?.content}
                     onChange={handleContentChange}
                 />
