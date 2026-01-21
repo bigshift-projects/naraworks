@@ -65,6 +65,7 @@ export default function EditorPage() {
     const router = useRouter();
 
     const [title, setTitle] = useState('');
+    const [content, setContent] = useState(''); // Track content for manual save
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -85,10 +86,12 @@ export default function EditorPage() {
     useEffect(() => {
         if (proposal) {
             setTitle(proposal.title);
+            setContent(proposal.content);
         }
     }, [proposal]);
 
-    // Debounced autosave for title
+    // Debounced autosave for title - COMMENTED OUT
+    /*
     useEffect(() => {
         if (!proposal) return;
 
@@ -100,8 +103,11 @@ export default function EditorPage() {
 
         return () => clearTimeout(timeoutId);
     }, [title]);
+    */
 
     const handleContentChange = useCallback((content: string) => {
+        setContent(content);
+        /* Autosave logic commented out
         if (!proposal) return;
 
         setIsSaving(true);
@@ -113,7 +119,14 @@ export default function EditorPage() {
         saveTimeoutRef.current = setTimeout(() => {
             mutation.mutate({ id, content });
         }, 10000); // Changed from 1500 to 10000
-    }, [id, proposal, mutation]);
+        */
+    }, []); // Removed id, proposal, mutation from dependencies to avoid unnecessary re-renders if not needed for state updates
+
+    const handleSave = async () => {
+        if (!proposal) return;
+        setIsSaving(true);
+        mutation.mutate({ id, title, content });
+    };
 
     const handleExportPDF = async () => {
         const element = document.getElementById('proposal-content');
@@ -214,6 +227,15 @@ export default function EditorPage() {
                             <span>저장됨</span>
                         )}
                     </div>
+
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                        <Save className="w-4 h-4" />
+                        저장
+                    </button>
 
                     <button
                         onClick={handleExportPDF}

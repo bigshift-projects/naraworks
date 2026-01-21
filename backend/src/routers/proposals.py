@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, UploadFile, File
 from typing import List
 from datetime import datetime, timedelta
 import uuid
 from ..models.proposals import Proposal, ProposalCreate, ProposalUpdate
 from ..services.supabase_client import supabase
+from ..services.pdf_service import extract_text_from_pdf
+from ..services.llm_service import generate_proposal_draft
 
 router = APIRouter(
     prefix="/api/proposals",
@@ -36,12 +38,70 @@ async def get_proposals():
         return MOCK_PROPOSALS
 
     try:
-        response = supabase.table("proposals").select("*").order("created_at", desc=True).execute()
+        response = supabase.table("naraworks_proposals").select("*").order("created_at", desc=True).execute()
         # Supabase-py v2 returns a response object with .data
         return response.data
     except Exception as e:
         print(f"DB Error, falling back to mock: {e}")
         return MOCK_PROPOSALS
+
+@router.post("/generate", response_model=Proposal)
+async def generate_proposal(
+    rfp: UploadFile = File(...), 
+    notice: UploadFile = File(...)
+):
+    # 1. Read files
+    rfp_bytes = await rfp.read()
+    notice_bytes = await notice.read()
+    
+    # 2. Extract text
+    rfp_text = extract_text_from_pdf(rfp_bytes)
+    notice_text = extract_text_from_pdf(notice_bytes)
+    
+    if not rfp_text and not notice_text:
+        raise HTTPException(status_code=400, detail="Could not extract text from uploaded PDFs")
+        
+    # 3. Generate content with LLM
+    generated = generate_proposal_draft(rfp_text, notice_text)
+    
+    # 4. Create Proposal object (similar to create_proposal but logic might differ if we just want to return it first)
+    # The requirement says "creates a proposal". I will save it to DB immediately or mock it.
+    
+    title = generated.get("title", "AI Generated Proposal")
+    content = generated.get("content", "")
+    user_id = "00000000-0000-0000-0000-000000000000" # Placeholder
+
+    # Save to DB logic
+    if not supabase:
+         new_mock = {
+            "id": f"mock-gen-{int(datetime.now().timestamp() * 1000)}",
+            "title": title,
+            "content": content,
+            "user_id": user_id,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        }
+         return new_mock
+
+    try:
+        data = {
+            "title": title,
+            "content": content,
+            "user_id": user_id
+        }
+        response = supabase.table("naraworks_proposals").insert(data).execute()
+        return response.data[0] if isinstance(response.data, list) and len(response.data) > 0 else response.data
+    except Exception as e:
+        print(f"DB Create Error (Generate), falling back to mock: {e}")
+        new_mock = {
+            "id": f"mock-gen-{int(datetime.now().timestamp() * 1000)}",
+            "title": title,
+            "content": content,
+            "user_id": user_id,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        }
+        return new_mock
 
 @router.post("/", response_model=Proposal, status_code=201)
 async def create_proposal(proposal: ProposalCreate):
@@ -62,8 +122,8 @@ async def create_proposal(proposal: ProposalCreate):
             "content": proposal.content,
             "user_id": proposal.user_id
         }
-        response = supabase.table("proposals").insert(data).select().single().execute()
-        return response.data
+        response = supabase.table("naraworks_proposals").insert(data).execute()
+        return response.data[0] if isinstance(response.data, list) and len(response.data) > 0 else response.data
     except Exception as e:
         print(f"DB Create Error, falling back to mock success: {e}")
         new_mock = {
@@ -87,7 +147,7 @@ async def get_proposal_by_id(id: str):
         raise HTTPException(status_code=404, detail="Proposal not found")
 
     try:
-        response = supabase.table("proposals").select("*").eq("id", id).single().execute()
+        response = supabase.table("naraworks_proposals").select("*").eq("id", id).single().execute()
         return response.data
     except Exception as e:
         print(f"DB Fetch Error, falling back to mock: {e}")
@@ -121,8 +181,8 @@ async def update_proposal(id: str, proposal: ProposalUpdate):
 
     try:
         update_data["updated_at"] = datetime.now().isoformat()
-        response = supabase.table("proposals").update(update_data).eq("id", id).select().single().execute()
-        return response.data
+        response = supabase.table("naraworks_proposals").update(update_data).eq("id", id).execute()
+        return response.data[0] if isinstance(response.data, list) and len(response.data) > 0 else response.data
     except Exception as e:
         print(f"DB Update Error, falling back to mock success: {e}")
         return {
