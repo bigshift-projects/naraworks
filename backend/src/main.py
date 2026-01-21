@@ -34,6 +34,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Trust Proxy Headers (for HTTPS on Railway)
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
+
 # Include Routers
 app.include_router(proposals.router)
 
