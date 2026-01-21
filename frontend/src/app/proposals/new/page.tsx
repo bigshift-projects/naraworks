@@ -8,6 +8,8 @@ export default function NewProposalPage() {
     const [step, setStep] = useState<'upload' | 'parsing' | 'review' | 'creating'>('upload');
     const [file, setFile] = useState<File | null>(null);
     const [toc, setToc] = useState<any[]>([]);
+    const [overview, setOverview] = useState<any>(null);
+    const [rfpText, setRfpText] = useState('');
     const [title, setTitle] = useState('');
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,7 +26,6 @@ export default function NewProposalPage() {
         formData.append('rfp', file);
 
         try {
-            // In a real app we might put this URL in env
             const res = await fetch('http://localhost:8080/api/proposals/parse-rfp', {
                 method: 'POST',
                 body: formData,
@@ -35,6 +36,8 @@ export default function NewProposalPage() {
             const data = await res.json();
             if (data.toc) {
                 setToc(data.toc);
+                setOverview(data.overview);
+                setRfpText(data.rfp_text);
                 setStep('review');
                 setTitle(file.name.replace('.pdf', '') + ' 제안서');
             } else {
@@ -51,22 +54,23 @@ export default function NewProposalPage() {
     const handleCreate = async () => {
         setStep('creating');
         try {
-            const res = await fetch('http://localhost:8080/api/proposals', {
+            const res = await fetch('http://localhost:8080/api/proposals/generate-sequential', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     title,
-                    user_id: '00000000-0000-0000-0000-000000000000', // Mock User
-                    content: '', // Start empty
-                    toc: toc,
-                    status: 'toc_confirmed' // Updated via router
+                    overview,
+                    toc,
+                    rfp_text: rfpText,
+                    user_id: '00000000-0000-0000-0000-000000000000',
                 }),
             });
 
-            if (!res.ok) throw new Error('Failed to create proposal');
+            if (!res.ok) throw new Error('Failed to start generation');
 
             const proposal = await res.json();
-            router.push(`/editor?id=${proposal.id}`);
+            // Redirect to editor - editor will show generation status
+            router.push(`/editor/${proposal.id}`);
         } catch (e) {
             console.error(e);
             alert('Error creating proposal');
@@ -79,6 +83,7 @@ export default function NewProposalPage() {
         newToc[index] = { ...newToc[index], [field]: value };
         setToc(newToc);
     };
+
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center py-20">
@@ -138,6 +143,34 @@ export default function NewProposalPage() {
 
                 {step === 'review' && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="mb-8 p-6 bg-blue-50 rounded-xl border border-blue-100">
+                            <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+                                <span>📋</span> 사업 개요 분석 결과
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span className="text-blue-600 font-semibold block mb-1">사업명</span>
+                                    <p className="text-gray-800 bg-white p-2 rounded border border-blue-100">{overview?.project_name || '-'}</p>
+                                </div>
+                                <div>
+                                    <span className="text-blue-600 font-semibold block mb-1">사업 기간</span>
+                                    <p className="text-gray-800 bg-white p-2 rounded border border-blue-100">{overview?.period || '-'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <span className="text-blue-600 font-semibold block mb-1">사업 예산</span>
+                                    <p className="text-gray-800 bg-white p-2 rounded border border-blue-100">{overview?.budget || '-'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <span className="text-blue-600 font-semibold block mb-1">주요 과업</span>
+                                    <ul className="list-disc list-inside bg-white p-3 rounded border border-blue-100 space-y-1">
+                                        {overview?.key_objectives?.map((obj: string, i: number) => (
+                                            <li key={i} className="text-gray-700">{obj}</li>
+                                        )) || <li className="text-gray-400">추출된 목표 없음</li>}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="mb-6">
                             <label className="block text-sm font-medium text-gray-700 mb-1">제안서 제목</label>
                             <input
@@ -152,6 +185,7 @@ export default function NewProposalPage() {
                             <h3 className="text-lg font-semibold text-gray-800">생성된 목차 (수정 가능)</h3>
                             <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">AI Generated</span>
                         </div>
+
 
                         <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[500px] overflow-y-auto">
                             {toc.map((section, idx) => (

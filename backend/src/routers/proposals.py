@@ -1,11 +1,18 @@
-from fastapi import APIRouter, HTTPException, Response, UploadFile, File
-from typing import List
+from fastapi import APIRouter, HTTPException, Response, UploadFile, File, BackgroundTasks
+from pydantic import BaseModel
+from typing import List, Dict, Any
 from datetime import datetime, timedelta
 import uuid
-from ..models.proposals import Proposal, ProposalCreate, ProposalUpdate, ProposalListItem
+from ..models.proposals import Proposal, ProposalCreate, ProposalUpdate, ProposalListItem, ProposalStatus
 from ..services.supabase_client import supabase
-from ..services.pdf_service import extract_text_from_pdf
-from ..services.llm_service import generate_proposal_draft, generate_section_content
+from ..services.pdf_service import extract_text_from_pdf, extract_pages_from_pdf, get_overview_candidates, get_toc_candidates
+from ..services.llm_service import (
+    generate_proposal_draft, 
+    generate_section_content,
+    analyze_rfp_overview,
+    structure_toc_from_pages
+)
+from ..services.proposal_engine import run_sequential_generation
 
 router = APIRouter(
     prefix="/api/proposals",
@@ -127,23 +134,6 @@ async def parse_rfp(
     rfp_bytes = await rfp.read()
     
     # 2. Extract pages using new service
-    # Need to import new functions from services/pdf_service and services/llm_service
-    # We update imports at the top of the file ideally, but for this snippet we assume imports are available 
-    # or we should update imports too.
-    # To avoid import errors in this snippet, I will assume the imports are updated or use fully qualified if possible, 
-    # but best practice is to update imports in the file.
-    
-    # Since this is a partial replace, I'll rely on the existing imports for `extract_text_from_pdf` 
-    # but I really need `extract_pages_from_pdf` etc. 
-    # I will replace the imports later or now. 
-    
-    # Actually, I should do a cleaner update. 
-    # Let's write the logic here assuming I update imports separately or the user does.
-    # But I am the agent. I should update imports too. 
-    
-    from ..services.pdf_service import extract_pages_from_pdf, get_overview_candidates, get_toc_candidates
-    from ..services.llm_service import analyze_rfp_overview, structure_toc_from_pages
-
     pages = extract_pages_from_pdf(rfp_bytes)
     
     if not pages:
@@ -163,10 +153,61 @@ async def parse_rfp(
     toc_text = "\n".join([p.text for p in toc_pages])
     toc_data = structure_toc_from_pages(toc_text)
     
+    # 5. Create a draft proposal and return info
+    # In a real app, we might store the whole RFP text in a separate table or storage.
+    # For simplicity, we just return the data.
+    
+    full_rfp_text = "\n".join([p.text for p in pages])
+    
     return {
         "overview": overview_data,
-        "toc": toc_data.get("toc", [])
+        "toc": toc_data.get("toc", []),
+        "rfp_text": full_rfp_text # Returning this to frontend to pass back for generation
     }
+
+class GenerationRequest(BaseModel):
+    title: str
+    overview: Dict[str, Any]
+    toc: List[Dict[str, Any]]
+    rfp_text: str
+    user_id: str = "00000000-0000-0000-0000-000000000000"
+
+@router.post(
+    "/generate-sequential",
+    summary="Start sequential proposal generation",
+    description="Creates a proposal record and starts the background task for sequential generation."
+)
+async def generate_sequential(req: GenerationRequest, background_tasks: BackgroundTasks):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database disconnected")
+
+    # 1. Create Proposal record
+    try:
+        data = {
+            "title": req.title,
+            "toc": req.toc,
+            "status": "generating_sections",
+            "user_id": req.user_id,
+        }
+        response = supabase.table("naraworks_proposals").insert(data).execute()
+        proposal = response.data[0]
+        proposal_id = proposal["id"]
+        
+        # 2. Start background task
+        background_tasks.add_task(
+            run_sequential_generation,
+            project_id=proposal_id,
+            overview=req.overview,
+            toc=req.toc,
+            rfp_text=req.rfp_text,
+            user_id=req.user_id
+        )
+        
+        return proposal
+    except Exception as e:
+        print(f"Error starting generation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post(
     "/{id}/generate-section",

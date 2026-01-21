@@ -12,6 +12,7 @@ interface Proposal {
     id: string;
     title: string;
     content: string;
+    status: string;
     updated_at: string;
     toc?: { title: string; description?: string; status?: string }[];
 }
@@ -29,6 +30,7 @@ const MOCK_PROPOSAL_DETAILS: Record<string, Proposal> = {
 <p>최신 LLM 기술을 활용하여 업무 자동화를 실현합니다.</p>
         `,
         updated_at: new Date().toISOString(),
+        status: 'draft',
     },
     'mock-2': {
         id: 'mock-2',
@@ -38,6 +40,7 @@ const MOCK_PROPOSAL_DETAILS: Record<string, Proposal> = {
 <p>공공 부문의 안정적인 클라우드 전환을 위한 컨설팅을 제공합니다.</p>
         `,
         updated_at: new Date(Date.now() - 86400000).toISOString(),
+        status: 'draft',
     },
 };
 
@@ -72,9 +75,16 @@ export default function EditorPage() {
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    const { data: proposal, isLoading, error } = useQuery({
+    const { data: proposal, isLoading, error, refetch } = useQuery({
         queryKey: ['proposal', id],
         queryFn: () => fetchProposal(id),
+        refetchInterval: (data) => {
+            // Poll if still generating
+            if (data?.state?.data?.status === 'generating_sections') {
+                return 3000;
+            }
+            return false;
+        }
     });
 
     const mutation = useMutation({
@@ -82,48 +92,38 @@ export default function EditorPage() {
         onSuccess: () => {
             setLastSaved(new Date());
             setIsSaving(false);
+            queryClient.invalidateQueries({ queryKey: ['proposal', id] });
         },
     });
 
     useEffect(() => {
         if (proposal) {
             setTitle(proposal.title);
-            setContent(proposal.content);
+            // Only update content from server if we are not currently editing or if it's the first load
+            // or if the server status is generating (to show progress)
+            if (proposal.status === 'generating_sections' || !content) {
+                setContent(proposal.content);
+            }
             if (proposal.toc) setToc(proposal.toc);
         }
     }, [proposal]);
 
-    // Debounced autosave for title - COMMENTED OUT
-    /*
+    // Polling effect for generating status
     useEffect(() => {
-        if (!proposal) return;
-
-        const timeoutId = setTimeout(() => {
-            if (mutation.isPending) return;
-            setIsSaving(true);
-            mutation.mutate({ id, title, content: undefined });
-        }, 10000); // Changed from 2000 to 10000
-
-        return () => clearTimeout(timeoutId);
-    }, [title]);
-    */
-
-    const handleContentChange = useCallback((content: string) => {
-        setContent(content);
-        /* Autosave logic commented out
-        if (!proposal) return;
-
-        setIsSaving(true);
-
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
+        let interval: NodeJS.Timeout;
+        if (proposal?.status === 'generating_sections') {
+            interval = setInterval(() => {
+                refetch();
+            }, 3000);
         }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [proposal?.status, refetch]);
 
-        saveTimeoutRef.current = setTimeout(() => {
-            mutation.mutate({ id, content });
-        }, 10000); // Changed from 1500 to 10000
-        */
-    }, []); // Removed id, proposal, mutation from dependencies to avoid unnecessary re-renders if not needed for state updates
+    const handleContentChange = useCallback((newContent: string) => {
+        setContent(newContent);
+    }, []);
 
     const handleSave = async () => {
         if (!proposal) return;
@@ -207,6 +207,7 @@ export default function EditorPage() {
         }
     };
 
+
     if (isLoading) {
         return (
             <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -286,11 +287,13 @@ export default function EditorPage() {
                     <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 tracking-wider">목차 (Table of Contents)</h3>
                     <div className="space-y-4">
                         {toc.map((section, idx) => (
-                            <div key={idx} className="group">
+                            <div key={idx} className={`group p-2 rounded-lg transition-colors ${section.status === 'generating' ? 'bg-blue-50 border border-blue-100' : 'hover:bg-gray-50'}`}>
                                 <div className="flex items-start justify-between gap-2 mb-1">
-                                    <span className="text-sm font-medium text-gray-800 leading-tight">{section.title}</span>
-                                    {section.status === 'generating' && <Loader2 className="w-3 h-3 animate-spin text-blue-500 shrink-0" />}
-                                    {section.status === 'done' && <Check className="w-3 h-3 text-green-500 shrink-0" />}
+                                    <span className={`text-sm font-medium leading-tight ${section.status === 'generating' ? 'text-blue-700' : 'text-gray-800'}`}>
+                                        {section.title}
+                                    </span>
+                                    {section.status === 'generating' && <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />}
+                                    {section.status === 'done' && <Check className="w-4 h-4 text-green-500 shrink-0" />}
                                 </div>
                                 <p className="text-xs text-gray-400 mb-2 line-clamp-2">{section.description}</p>
 
@@ -332,7 +335,18 @@ export default function EditorPage() {
                 </aside>
 
                 {/* Editor Content Area */}
-                <main className="flex-1 p-8 md:p-12 w-full">
+                <main className="flex-1 p-8 md:p-12 w-full relative">
+                    {proposal?.status === 'generating_sections' && (
+                        <div className="mb-8 p-4 bg-blue-600 text-white rounded-xl shadow-lg flex items-center justify-between animate-pulse">
+                            <div className="flex items-center gap-3">
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <span className="font-medium">AI가 실시간으로 제안서를 작성하고 있습니다... (3초마다 자동 갱신)</span>
+                            </div>
+                            <div className="text-sm bg-blue-700 px-3 py-1 rounded-full">
+                                {toc.filter(s => s.status === 'done').length} / {toc.length} 완료
+                            </div>
+                        </div>
+                    )}
                     <Editor
                         id="proposal-content"
                         initialContent={proposal?.content}
