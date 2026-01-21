@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS public.naraworks_proposals (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     title TEXT NOT NULL,
     content TEXT,
+    toc JSONB,
+    status TEXT DEFAULT 'draft' NOT NULL,
     user_id UUID NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
@@ -19,5 +21,19 @@ CREATE POLICY "Allow all access to naraworks_proposals" ON public.naraworks_prop
     USING (true)
     WITH CHECK (true);
 
--- 4. Enable realtime for this table
-ALTER PUBLICATION supabase_realtime ADD TABLE public.naraworks_proposals;
+-- 5. Create the knowledge base table
+CREATE TABLE IF NOT EXISTS public.naraworks_knowledge (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    filename TEXT NOT NULL,
+    content TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- 6. Enable RLS for knowledge table
+ALTER TABLE public.naraworks_knowledge ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all access to naraworks_knowledge" ON public.naraworks_knowledge
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- 7. Enable realtime for knowledge table
+ALTER PUBLICATION supabase_realtime ADD TABLE public.naraworks_knowledge;

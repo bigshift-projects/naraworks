@@ -4,6 +4,8 @@
     "scripts": {
         "dev:backend": "cd backend && ./dev.sh",
         "dev:frontend": "cd frontend && npm run dev",
+        "backend": "npm run dev:backend",
+        "frontend": "npm run dev:frontend",
         "back": "npm run dev:backend",
         "front": "npm run dev:frontend"
     }

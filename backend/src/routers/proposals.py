@@ -5,7 +5,7 @@ import uuid
 from ..models.proposals import Proposal, ProposalCreate, ProposalUpdate, ProposalListItem
 from ..services.supabase_client import supabase
 from ..services.pdf_service import extract_text_from_pdf
-from ..services.llm_service import generate_proposal_draft, generate_toc, generate_section_content
+from ..services.llm_service import generate_proposal_draft, generate_section_content
 
 router = APIRouter(
     prefix="/api/proposals",
@@ -118,7 +118,7 @@ async def generate_proposal(
 @router.post(
     "/parse-rfp",
     summary="Parse RFP and generate TOC",
-    description="Upload an RFP PDF to generate an initial Table of Contents (TOC)."
+    description="Upload an RFP PDF to generate an initial Table of Contents (TOC) and Project Overview."
 )
 async def parse_rfp(
     rfp: UploadFile = File(..., description="The RFP PDF file")
@@ -126,16 +126,47 @@ async def parse_rfp(
     # 1. Read file
     rfp_bytes = await rfp.read()
     
-    # 2. Extract text
-    rfp_text = extract_text_from_pdf(rfp_bytes)
+    # 2. Extract pages using new service
+    # Need to import new functions from services/pdf_service and services/llm_service
+    # We update imports at the top of the file ideally, but for this snippet we assume imports are available 
+    # or we should update imports too.
+    # To avoid import errors in this snippet, I will assume the imports are updated or use fully qualified if possible, 
+    # but best practice is to update imports in the file.
     
-    if not rfp_text:
+    # Since this is a partial replace, I'll rely on the existing imports for `extract_text_from_pdf` 
+    # but I really need `extract_pages_from_pdf` etc. 
+    # I will replace the imports later or now. 
+    
+    # Actually, I should do a cleaner update. 
+    # Let's write the logic here assuming I update imports separately or the user does.
+    # But I am the agent. I should update imports too. 
+    
+    from ..services.pdf_service import extract_pages_from_pdf, get_overview_candidates, get_toc_candidates
+    from ..services.llm_service import analyze_rfp_overview, structure_toc_from_pages
+
+    pages = extract_pages_from_pdf(rfp_bytes)
+    
+    if not pages:
         raise HTTPException(status_code=400, detail="Could not extract text from uploaded PDF")
         
-    # 3. Generate TOC with LLM
-    generated_toc = generate_toc(rfp_text)
+    # 3. Analyze Overview (First 15-20 pages)
+    overview_pages = get_overview_candidates(pages, limit=15)
+    overview_text = "\n".join([p.text for p in overview_pages])
+    overview_data = analyze_rfp_overview(overview_text)
     
-    return generated_toc
+    # 4. Identify and Structure TOC
+    toc_pages = get_toc_candidates(pages)
+    if not toc_pages:
+        # Fallback: Scan first 20 pages if no keywords found (unlikely for Korean RFP)
+        toc_pages = pages[:20]
+        
+    toc_text = "\n".join([p.text for p in toc_pages])
+    toc_data = structure_toc_from_pages(toc_text)
+    
+    return {
+        "overview": overview_data,
+        "toc": toc_data.get("toc", [])
+    }
 
 @router.post(
     "/{id}/generate-section",
