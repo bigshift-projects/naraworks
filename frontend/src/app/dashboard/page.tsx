@@ -5,7 +5,7 @@ import axios from '@/lib/axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FileText, Loader2, Plus, Sparkles, X, Trash2, Download } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { useState, useEffect } from 'react';
 import Editor from '@/components/Editor';
 import { generatePdf } from '@/utils/pdfGenerator';
@@ -15,6 +15,7 @@ interface Proposal {
     id: string;
     title: string;
     content?: string;
+    created_at: string;
     updated_at: string;
 }
 
@@ -22,11 +23,13 @@ const MOCK_PROPOSALS: Proposal[] = [
     {
         id: 'mock-1',
         title: '[목업] 2024년도 AI 바우처 지원사업 제안서',
+        created_at: new Date(Date.now() - 172800000).toISOString(),
         updated_at: new Date().toISOString(),
     },
     {
         id: 'mock-2',
         title: '[목업] 공공 클라우드 전환 컨설팅 사업 제안서',
+        created_at: new Date(Date.now() - 259200000).toISOString(),
         updated_at: new Date(Date.now() - 86400000).toISOString(),
     },
 ];
@@ -250,9 +253,14 @@ export default function DashboardPage() {
                             <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors line-clamp-1">
                                 {proposal.title}
                             </h3>
-                            <p className="text-sm text-gray-500">
-                                {formatDistanceToNow(new Date(proposal.updated_at), { addSuffix: true })} 수정됨
-                            </p>
+                            <div className="space-y-1">
+                                <p className="text-sm text-gray-500">
+                                    {format(new Date(proposal.created_at), 'yyyy.MM.dd')} 생성
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                    {formatDistanceToNow(new Date(proposal.updated_at), { addSuffix: true })} 수정됨
+                                </p>
+                            </div>
                             <div className="flex justify-end gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                     onClick={(e) => handleDownloadPdf(e, proposal)}

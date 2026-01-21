@@ -13,6 +13,7 @@ interface Proposal {
     title: string;
     content: string;
     updated_at: string;
+    toc?: { title: string; description?: string; status?: string }[];
 }
 
 const MOCK_PROPOSAL_DETAILS: Record<string, Proposal> = {
@@ -50,12 +51,12 @@ const fetchProposal = async (id: string) => {
     return data;
 };
 
-const updateProposal = async ({ id, title, content }: { id: string; title?: string; content?: string }) => {
+const updateProposal = async ({ id, title, content, toc, status }: { id: string; title?: string; content?: string; toc?: any[]; status?: string }) => {
     if (id.startsWith('mock-')) {
         // Mock update - just return success
         return { success: true };
     }
-    const { data } = await axios.put(`/api/proposals/${id}`, { title, content });
+    const { data } = await axios.put(`/api/proposals/${id}`, { title, content, toc, status });
     return data;
 };
 
@@ -66,6 +67,7 @@ export default function EditorPage() {
 
     const [title, setTitle] = useState('');
     const [content, setContent] = useState(''); // Track content for manual save
+    const [toc, setToc] = useState<any[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -87,6 +89,7 @@ export default function EditorPage() {
         if (proposal) {
             setTitle(proposal.title);
             setContent(proposal.content);
+            if (proposal.toc) setToc(proposal.toc);
         }
     }, [proposal]);
 
@@ -141,6 +144,41 @@ export default function EditorPage() {
             alert('PDF 생성 중 오류가 발생했습니다.');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleGenerateSection = async (index: number) => {
+        const section = toc[index];
+        if (!section) return;
+
+        // Update status to generating
+        const newToc = [...toc];
+        newToc[index] = { ...section, status: 'generating' };
+        setToc(newToc);
+
+        try {
+            const res = await axios.post(`/api/proposals/${id}/generate-section`, {
+                section_title: section.title
+            });
+
+            const generatedContent = res.data.content;
+
+            // Append content
+            const newContent = content + `\n\n${generatedContent}`;
+            setContent(newContent);
+
+            // Update TOC status
+            newToc[index] = { ...section, status: 'done' };
+            setToc(newToc);
+
+            // Save immediately
+            mutation.mutate({ id, title, content: newContent, toc: newToc });
+
+        } catch (e) {
+            console.error(e);
+            alert('섹션 생성 실패');
+            newToc[index] = { ...section, status: 'error' };
+            setToc(newToc);
         }
     };
 
@@ -216,14 +254,46 @@ export default function EditorPage() {
                 </div>
             </header>
 
-            {/* Editor Content Area */}
-            <main className="flex-1 p-8 md:p-12 max-w-5xl mx-auto w-full">
-                <Editor
-                    id="proposal-content"
-                    initialContent={proposal?.content}
-                    onChange={handleContentChange}
-                />
-            </main>
+            {/* Main Layout with Sidebar */}
+            <div className="flex flex-1 max-w-7xl mx-auto w-full">
+                {/* TOC Sidebar */}
+                <aside className="w-80 border-r border-gray-200 bg-white p-6 hidden lg:block h-[calc(100vh-80px)] overflow-y-auto sticky top-[80px]">
+                    <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 tracking-wider">목차 (Table of Contents)</h3>
+                    <div className="space-y-4">
+                        {toc.map((section, idx) => (
+                            <div key={idx} className="group">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                    <span className="text-sm font-medium text-gray-800 leading-tight">{section.title}</span>
+                                    {section.status === 'generating' && <Loader2 className="w-3 h-3 animate-spin text-blue-500 shrink-0" />}
+                                    {section.status === 'done' && <Check className="w-3 h-3 text-green-500 shrink-0" />}
+                                </div>
+                                <p className="text-xs text-gray-400 mb-2 line-clamp-2">{section.description}</p>
+
+                                {(!section.status || section.status === 'pending' || section.status === 'error') && (
+                                    <button
+                                        onClick={() => handleGenerateSection(idx)}
+                                        className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
+                                    >
+                                        <span className="text-[10px]">✨</span> 생성하기
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        {toc.length === 0 && (
+                            <p className="text-sm text-gray-400 italic">목차가 없습니다. RFP를 분석하여 목차를 생성해보세요.</p>
+                        )}
+                    </div>
+                </aside>
+
+                {/* Editor Content Area */}
+                <main className="flex-1 p-8 md:p-12 w-full">
+                    <Editor
+                        id="proposal-content"
+                        initialContent={proposal?.content}
+                        onChange={handleContentChange}
+                    />
+                </main>
+            </div>
 
             <style jsx global>{`
         @media print {

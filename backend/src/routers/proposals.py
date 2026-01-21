@@ -5,7 +5,7 @@ import uuid
 from ..models.proposals import Proposal, ProposalCreate, ProposalUpdate, ProposalListItem
 from ..services.supabase_client import supabase
 from ..services.pdf_service import extract_text_from_pdf
-from ..services.llm_service import generate_proposal_draft
+from ..services.llm_service import generate_proposal_draft, generate_toc, generate_section_content
 
 router = APIRouter(
     prefix="/api/proposals",
@@ -116,6 +116,42 @@ async def generate_proposal(
         return new_mock
 
 @router.post(
+    "/parse-rfp",
+    summary="Parse RFP and generate TOC",
+    description="Upload an RFP PDF to generate an initial Table of Contents (TOC)."
+)
+async def parse_rfp(
+    rfp: UploadFile = File(..., description="The RFP PDF file")
+):
+    # 1. Read file
+    rfp_bytes = await rfp.read()
+    
+    # 2. Extract text
+    rfp_text = extract_text_from_pdf(rfp_bytes)
+    
+    if not rfp_text:
+        raise HTTPException(status_code=400, detail="Could not extract text from uploaded PDF")
+        
+    # 3. Generate TOC with LLM
+    generated_toc = generate_toc(rfp_text)
+    
+    return generated_toc
+
+@router.post(
+    "/{id}/generate-section",
+    summary="Generate content for a specific section",
+    description="Generate draft content for a specific section of the proposal using LLM."
+)
+async def generate_section(id: str, section_title: str):
+    # In a real app, we would fetch the proposal to get the RFP context (if linked) 
+    # or accept context in the request body.
+    # For now, we will perform a simple generation. 
+    # TODO: Fetch RFP text associated with this proposal if possible.
+    
+    content = generate_section_content(section_title)
+    return {"content": content}
+
+@router.post(
     "/", 
     response_model=Proposal, 
     status_code=201,
@@ -138,7 +174,9 @@ async def create_proposal(proposal: ProposalCreate):
         data = {
             "title": proposal.title,
             "content": proposal.content,
-            "user_id": proposal.user_id
+            "user_id": proposal.user_id,
+            "toc": proposal.toc,
+            "status": proposal.status
         }
         response = supabase.table("naraworks_proposals").insert(data).execute()
         return response.data[0] if isinstance(response.data, list) and len(response.data) > 0 else response.data
@@ -193,6 +231,10 @@ async def update_proposal(id: str, proposal: ProposalUpdate):
         update_data["title"] = proposal.title
     if proposal.content is not None:
         update_data["content"] = proposal.content
+    if proposal.toc is not None:
+        update_data["toc"] = proposal.toc
+    if proposal.status is not None:
+        update_data["status"] = proposal.status
     
     if is_mock:
         # In a real mock scenario we might update the in-memory list, but for now just return the echo

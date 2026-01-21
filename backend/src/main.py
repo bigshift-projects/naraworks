@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import proposals
+from .routers import proposals, knowledge
 import uvicorn
 import os
 
@@ -40,6 +40,7 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
 # Include Routers
 app.include_router(proposals.router)
+app.include_router(knowledge.router)
 
 @app.get("/")
 async def root():
