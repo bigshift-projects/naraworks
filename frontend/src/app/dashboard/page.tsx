@@ -1,16 +1,20 @@
 'use client';
 
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from '@/lib/axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileText, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { FileText, Loader2, Plus, Sparkles, X, Trash2, Download } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Editor from '@/components/Editor';
+import { generatePdf } from '@/utils/pdfGenerator';
+
 
 interface Proposal {
     id: string;
     title: string;
+    content?: string;
     updated_at: string;
 }
 
@@ -41,6 +45,10 @@ const createProposal = async () => {
     return data;
 };
 
+const deleteProposal = async (id: string) => {
+    await axios.delete(`/api/proposals/${id}`);
+};
+
 const generateProposal = async (formData: FormData) => {
     const { data } = await axios.post<Proposal>('/api/proposals/generate', formData, {
         headers: {
@@ -57,6 +65,13 @@ export default function DashboardPage() {
     // File states
     const [rfpFile, setRfpFile] = useState<File | null>(null);
     const [noticeFile, setNoticeFile] = useState<File | null>(null);
+
+    // PDF Export state
+    const [pdfTargetProposal, setPdfTargetProposal] = useState<Proposal | null>(null);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+    const queryClient = useQueryClient();
+
 
     const { data: proposals, isLoading, error } = useQuery({
         queryKey: ['proposals'],
@@ -77,6 +92,67 @@ export default function DashboardPage() {
             router.push(`/editor/${newProposal.id}`);
         },
     });
+
+    const deleteMutation = useMutation({
+        mutationFn: deleteProposal,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['proposals'] });
+        },
+    });
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.preventDefault(); // Prevent Link navigation
+        e.stopPropagation();
+
+        if (confirm('정말로 이 제안서를 삭제하시겠습니까?')) {
+            deleteMutation.mutate(id);
+        }
+    };
+
+    const handleDownloadPdf = async (e: React.MouseEvent, proposal: Proposal) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (isGeneratingPdf) return;
+
+        // If content is missing in the list view object, we might need to fetch it first.
+        // Assuming fetchProposals returns full objects or we fetch detail.
+        // If the current list API returns content, we can use it directly.
+        // Based on previous code, fetchProposals returns Proposal[] and MOCK has content but interface didn't.
+        // Let's assume content is available or we need to fetch detail if missing.
+
+        // For robust implementation, let's fetch the latest detail to ensure we have content
+        setIsGeneratingPdf(true);
+        try {
+            // We can optimize this if the list already has content, but fetching ensures fresh data
+            const { data: fullProposal } = await axios.get<Proposal>(`/api/proposals/${proposal.id}`);
+            setPdfTargetProposal(fullProposal);
+            // The useEffect below will trigger the actual generation once the Editor receives the content
+        } catch (error) {
+            console.error("Failed to fetch proposal for PDF", error);
+            setIsGeneratingPdf(false);
+            alert("제안서 내용을 불러오는데 실패했습니다.");
+        }
+    };
+
+    // Effect to trigger PDF generation when pdfTargetProposal is set and rendered
+    useEffect(() => {
+        if (pdfTargetProposal && isGeneratingPdf) {
+            // Give a small delay for the hidden editor to render the content
+            const timer = setTimeout(async () => {
+                try {
+                    await generatePdf('hidden-pdf-editor', pdfTargetProposal.title || '제안서');
+                } catch (e) {
+                    console.error("PDF Generation failed", e);
+                    alert("PDF 생성에 실패했습니다.");
+                } finally {
+                    setPdfTargetProposal(null);
+                    setIsGeneratingPdf(false);
+                }
+            }, 1000); // 1 second delay to ensure TipTap renders
+            return () => clearTimeout(timer);
+        }
+    }, [pdfTargetProposal, isGeneratingPdf]);
 
     const handleCreateProposal = () => {
         createMutation.mutate();
@@ -177,6 +253,27 @@ export default function DashboardPage() {
                             <p className="text-sm text-gray-500">
                                 {formatDistanceToNow(new Date(proposal.updated_at), { addSuffix: true })} 수정됨
                             </p>
+                            <div className="flex justify-end gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={(e) => handleDownloadPdf(e, proposal)}
+                                    disabled={isGeneratingPdf}
+                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="PDF 다운로드"
+                                >
+                                    {isGeneratingPdf && pdfTargetProposal?.id === proposal.id ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Download className="w-4 h-4" />
+                                    )}
+                                </button>
+                                <button
+                                    onClick={(e) => handleDelete(e, proposal.id)}
+                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="삭제"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
                         </Link>
                     ))}
 
@@ -301,6 +398,18 @@ export default function DashboardPage() {
                                 </div>
                             </form>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Hidden Editor for PDF Generation */}
+            {pdfTargetProposal && (
+                <div className="fixed -left-[9999px] top-0 overflow-hidden h-0 w-0">
+                    <div id="hidden-pdf-editor" className="bg-white" style={{ width: '800px' }}>
+                        <Editor
+                            id="pdf-content" // Inner ID used by Editor, but we wrap it
+                            initialContent={pdfTargetProposal.content}
+                            onChange={() => { }}
+                        />
                     </div>
                 </div>
             )}

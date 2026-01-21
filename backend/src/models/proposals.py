@@ -1,23 +1,23 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Any
 from datetime import datetime
 
 class ProposalBase(BaseModel):
-    title: str
-    content: Optional[Any] = None
-    user_id: str  # Using str to support both UUIDs and potential mock IDs if needed, though usually UUID
+    title: str = Field(..., description="The title of the proposal draft", example="2024 AI Voucher Project Proposal")
+    content: Optional[Any] = Field(None, description="The HTML content of the proposal draft", example="<h1>Proposal</h1><p>Content goes here...</p>")
+    user_id: str = Field(..., description="The ID of the user who owns the proposal", example="00000000-0000-0000-0000-000000000000")
 
 class ProposalCreate(ProposalBase):
     pass
 
 class ProposalUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[Any] = None
+    title: Optional[str] = Field(None, description="Updated title of the proposal", example="Updated Proposal Title")
+    content: Optional[Any] = Field(None, description="Updated HTML content of the proposal", example="<h2>Updated Content</h2>")
 
 class Proposal(ProposalBase):
-    id: str
-    created_at: datetime
-    updated_at: datetime
+    id: str = Field(..., description="Unique identifier for the proposal", example="mock-1")
+    created_at: datetime = Field(..., description="The timestamp when the proposal was created")
+    updated_at: datetime = Field(..., description="The timestamp when the proposal was last updated")
 
     class Config:
         from_attributes = True

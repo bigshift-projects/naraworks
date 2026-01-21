@@ -134,39 +134,8 @@ export default function EditorPage() {
 
         try {
             setIsSaving(true);
-            const { toPng } = await import('html-to-image');
-            const { jsPDF } = await import('jspdf');
-
-            // Capture at a standardized width (e.g., 800px) to maintain a consistent A4-like layout
-            const dataUrl = await toPng(element, {
-                quality: 1.0,
-                backgroundColor: '#ffffff',
-                width: 800,
-                style: {
-                    border: 'none',
-                    boxShadow: 'none',
-                    borderRadius: '0',
-                    margin: '0',
-                    width: '800px',
-                },
-                filter: (node) => {
-                    return !(node instanceof Element && node.classList.contains('no-print'));
-                }
-            });
-
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-
-            const imgProps = pdf.getImageProperties(dataUrl);
-            const ratio = imgProps.height / imgProps.width;
-            const imgWidth = pdfWidth;
-            const imgHeight = pdfWidth * ratio;
-
-            // Simple handling for multi-page if height exceeds single A4
-            // For now, it will scale to fit width. 
-            pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
-            pdf.save(`${title || '제안서'}.pdf`);
+            const { generatePdf } = await import('@/utils/pdfGenerator');
+            await generatePdf('proposal-content', title || '제안서');
         } catch (error) {
             console.error('PDF Export failed:', error);
             alert('PDF 생성 중 오류가 발생했습니다.');

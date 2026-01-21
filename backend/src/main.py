@@ -4,7 +4,26 @@ from .routers import proposals
 import uvicorn
 import os
 
-app = FastAPI(title="Naraworks Backend")
+app = FastAPI(
+    title="Naraworks API",
+    description="""
+Naraworks Backend API for B2G Proposal Generation and Management.
+This API provides endpoints for:
+*   Listing and managing proposal drafts.
+*   Generating new proposal drafts using LLM from PDF inputs (RFP and Notice).
+""",
+    version="1.0.0",
+    contact={
+        "name": "Naraworks Support",
+        "email": "support@naraworks.com",
+    },
+    openapi_tags=[
+        {
+            "name": "proposals",
+            "description": "Operations with proposal drafts, including generation and management.",
+        }
+    ]
+)
 
 # CORS Configuration
 app.add_middleware(

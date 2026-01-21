@@ -48,7 +48,7 @@ def generate_proposal_draft(rfp_text: str, notice_text: str) -> dict:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.2",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that outputs JSON."},
                 {"role": "user", "content": system_prompt + "\n\n" + user_message}
