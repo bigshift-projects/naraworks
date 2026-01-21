@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Response, UploadFile, File
 from typing import List
 from datetime import datetime, timedelta
 import uuid
-from ..models.proposals import Proposal, ProposalCreate, ProposalUpdate
+from ..models.proposals import Proposal, ProposalCreate, ProposalUpdate, ProposalListItem
 from ..services.supabase_client import supabase
 from ..services.pdf_service import extract_text_from_pdf
 from ..services.llm_service import generate_proposal_draft
@@ -33,9 +33,9 @@ MOCK_PROPOSALS = [
 
 @router.get(
     "/", 
-    response_model=List[Proposal],
-    summary="List all proposals",
-    description="Fetch a list of all proposal drafts, ordered by creation date descending. Falls back to mock data if database is disconnected."
+    response_model=List[ProposalListItem],
+    summary="List all proposals (without content)",
+    description="Fetch a list of all proposal drafts excluding their HTML content, ordered by creation date descending. Falls back to mock data if database is disconnected."
 )
 async def get_proposals():
     if not supabase:
@@ -43,7 +43,9 @@ async def get_proposals():
         return MOCK_PROPOSALS
 
     try:
-        response = supabase.table("naraworks_proposals").select("*").order("created_at", desc=True).execute()
+        # Explicitly select columns to exclude 'content' for performance
+        columns = "id, title, user_id, created_at, updated_at"
+        response = supabase.table("naraworks_proposals").select(columns).order("created_at", desc=True).execute()
         # Supabase-py v2 returns a response object with .data
         return response.data
     except Exception as e:

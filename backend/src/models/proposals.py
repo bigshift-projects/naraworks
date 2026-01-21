@@ -21,3 +21,13 @@ class Proposal(ProposalBase):
 
     class Config:
         from_attributes = True
+
+class ProposalListItem(BaseModel):
+    id: str = Field(..., description="Unique identifier for the proposal", example="mock-1")
+    title: str = Field(..., description="The title of the proposal draft", example="2024 AI Voucher Project Proposal")
+    user_id: str = Field(..., description="The ID of the user who owns the proposal", example="00000000-0000-0000-0000-000000000000")
+    created_at: datetime = Field(..., description="The timestamp when the proposal was created")
+    updated_at: datetime = Field(..., description="The timestamp when the proposal was last updated")
+
+    class Config:
+        from_attributes = True

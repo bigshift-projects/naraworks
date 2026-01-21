@@ -1,0 +1,10 @@
+{
+    "name": "naraworks",
+    "private": true,
+    "scripts": {
+        "dev:backend": "cd backend && ./dev.sh",
+        "dev:frontend": "cd frontend && npm run dev",
+        "back": "npm run dev:backend",
+        "front": "npm run dev:frontend"
+    }
+}
