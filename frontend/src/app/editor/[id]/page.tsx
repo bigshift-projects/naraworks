@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from '@/lib/axios';
 import { useState, useEffect, useCallback } from 'react';
 import Editor from '@/components/Editor';
+import StepProgress from '@/components/StepProgress';
 import { ChevronLeft, Loader2, Save, Download, Check, FileText } from 'lucide-react';
 import Link from 'next/link';
 
@@ -73,6 +74,14 @@ export default function EditorPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
+    // Progress State
+    const [currentStep, setCurrentStep] = useState(1);
+    const [stepStatus, setStepStatus] = useState({
+        pdfUploaded: false,
+        overviewExtracted: false
+    });
+    const [overviewData, setOverviewData] = useState<any>(null);
+
     const { data: proposal, isLoading, error, refetch } = useQuery({
         queryKey: ['proposal', id],
         queryFn: () => fetchProposal(id),
@@ -93,7 +102,13 @@ export default function EditorPage() {
             if (proposal.status === 'generating_sections' || !content) {
                 setContent(proposal.content);
             }
-            if (proposal.toc) setToc(proposal.toc);
+            if (proposal.toc) {
+                setToc(proposal.toc);
+                // Assume if TOC exists, PDF was uploaded and overview extracted (restoring state)
+                if (proposal.toc.length > 0) {
+                    setStepStatus(prev => ({ ...prev, pdfUploaded: true, overviewExtracted: true }));
+                }
+            }
         }
     }, [proposal, content]);
 
@@ -143,20 +158,32 @@ export default function EditorPage() {
         const formData = new FormData();
         formData.append('rfp', file);
 
+        // Update status: PDF Uploaded
+        setStepStatus(prev => ({ ...prev, pdfUploaded: true }));
+
         try {
-            alert('RFP 분석 중입니다. 잠시만 기다려주세요...');
+            // alert('RFP 분석 중입니다. 잠시만 기다려주세요...'); // Removed alert to avoid blocking UI update
             const res = await axios.post('/api/proposals/parse-rfp', formData);
 
             if (res.data.toc && res.data.toc.length > 0) {
                 const newToc = res.data.toc.map((item: any) => ({ ...item, status: 'pending' }));
                 setToc(newToc);
+
+                // Update Overview Data & Status
+                if (res.data.overview) {
+                    setOverviewData(res.data.overview);
+                    setStepStatus(prev => ({ ...prev, overviewExtracted: true }));
+                }
+
                 mutation.mutate({ id, title, content, toc: newToc, status: 'toc_confirmed' });
             } else {
                 alert('목차 생성에 실패했습니다. PDF에 텍스트가 포함되어 있는지 확인해주세요.');
+                setStepStatus(prev => ({ ...prev, pdfUploaded: false })); // Reset on failure
             }
         } catch (e) {
             console.error(e);
             alert('목차 생성 중 오류가 발생했습니다.');
+            setStepStatus(prev => ({ ...prev, pdfUploaded: false })); // Reset on failure
         }
     };
 
@@ -260,53 +287,67 @@ export default function EditorPage() {
             </header>
 
             <div className="flex flex-1 max-w-7xl mx-auto w-full">
-                <aside className="w-80 border-r border-gray-200 bg-white p-6 hidden lg:block h-[calc(100vh-80px)] overflow-y-auto sticky top-[80px]">
-                    <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 tracking-wider">목차 (Table of Contents)</h3>
-                    <div className="space-y-4">
-                        {toc.map((section, idx) => (
-                            <div key={idx} className={`group p-2 rounded-lg transition-colors ${section.status === 'generating' ? 'bg-blue-50 border border-blue-100' : 'hover:bg-gray-50'}`}>
-                                <div className="flex items-start justify-between gap-2 mb-1">
-                                    <span className={`text-sm font-medium leading-tight ${section.status === 'generating' ? 'text-blue-700' : 'text-gray-800'}`}>
-                                        {section.title}
-                                    </span>
-                                    {section.status === 'generating' && <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />}
-                                    {section.status === 'done' && <Check className="w-4 h-4 text-green-500 shrink-0" />}
+                {/* Sidebar (Split Layout) */}
+                <aside className="w-80 border-r border-gray-200 bg-white flex flex-col h-[calc(100vh-80px)] sticky top-[80px]">
+
+                    {/* Top Hand: TOC (Flexible height) */}
+                    <div className="flex-1 overflow-y-auto p-6 min-h-[300px]">
+                        <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 tracking-wider">목차 (Table of Contents)</h3>
+                        <div className="space-y-4">
+                            {toc.map((section, idx) => (
+                                <div key={idx} className={`group p-2 rounded-lg transition-colors ${section.status === 'generating' ? 'bg-blue-50 border border-blue-100' : 'hover:bg-gray-50'}`}>
+                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                        <span className={`text-sm font-medium leading-tight ${section.status === 'generating' ? 'text-blue-700' : 'text-gray-800'}`}>
+                                            {section.title}
+                                        </span>
+                                        {section.status === 'generating' && <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />}
+                                        {section.status === 'done' && <Check className="w-4 h-4 text-green-500 shrink-0" />}
+                                    </div>
+                                    <p className="text-xs text-gray-400 mb-2 line-clamp-2">{section.description}</p>
+                                    {(!section.status || section.status === 'pending' || section.status === 'error') && (
+                                        <button
+                                            onClick={() => handleGenerateSection(idx)}
+                                            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
+                                        >
+                                            <span className="text-[10px]">✨</span> 생성하기
+                                        </button>
+                                    )}
                                 </div>
-                                <p className="text-xs text-gray-400 mb-2 line-clamp-2">{section.description}</p>
-                                {(!section.status || section.status === 'pending' || section.status === 'error') && (
-                                    <button
-                                        onClick={() => handleGenerateSection(idx)}
-                                        className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
+                            ))}
+                            {toc.length === 0 && (
+                                <div className="py-4">
+                                    <input type="file" id="sidebar-rfp-upload" className="hidden" accept=".pdf" onChange={handleGenerateTOCFromRFP} />
+                                    <label
+                                        htmlFor="sidebar-rfp-upload"
+                                        className="flex flex-col items-center justify-center gap-3 px-4 py-8 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl text-center cursor-pointer transition-all shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 active:translate-y-0 active:scale-[0.98] w-full group mb-4"
                                     >
-                                        <span className="text-[10px]">✨</span> 생성하기
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                        {toc.length === 0 && (
-                            <div className="py-4">
-                                <input type="file" id="sidebar-rfp-upload" className="hidden" accept=".pdf" onChange={handleGenerateTOCFromRFP} />
-                                <label
-                                    htmlFor="sidebar-rfp-upload"
-                                    className="flex flex-col items-center justify-center gap-3 px-4 py-8 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl text-center cursor-pointer transition-all shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 active:translate-y-0 active:scale-[0.98] w-full group mb-4"
-                                >
-                                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors shadow-inner">
-                                        <FileText className="w-6 h-6 text-white" />
+                                        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors shadow-inner">
+                                            <FileText className="w-6 h-6 text-white" />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-base font-bold tracking-tight">AI로 초안 작성하기</span>
+                                            <span className="text-[11px] text-blue-100 font-medium">RFP 분석 및 자동 생성</span>
+                                        </div>
+                                    </label>
+                                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 border-dashed">
+                                        <p className="text-[12px] text-gray-500 text-center leading-relaxed">
+                                            제안요청서(RFP)를 업로드하시면<br />
+                                            AI가 <span className="text-blue-600 font-semibold">목차 구성부터 본문 초안</span>까지<br />
+                                            한 번에 작성해 드립니다.
+                                        </p>
                                     </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-base font-bold tracking-tight">AI로 초안 작성하기</span>
-                                        <span className="text-[11px] text-blue-100 font-medium">RFP 분석 및 자동 생성</span>
-                                    </div>
-                                </label>
-                                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 border-dashed">
-                                    <p className="text-[12px] text-gray-500 text-center leading-relaxed">
-                                        제안요청서(RFP)를 업로드하시면<br />
-                                        AI가 <span className="text-blue-600 font-semibold">목차 구성부터 본문 초안</span>까지<br />
-                                        한 번에 작성해 드립니다.
-                                    </p>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Bottom Half: Step Progress (Fixed/Flexible) */}
+                    <div className="h-1/3 min-h-[250px] border-t border-gray-200">
+                        <StepProgress
+                            step={currentStep}
+                            status={stepStatus}
+                            overviewData={overviewData}
+                        />
                     </div>
                 </aside>
 

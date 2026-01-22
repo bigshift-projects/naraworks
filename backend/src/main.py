@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import proposals, knowledge
+from .routers import proposals, knowledge, generate
 import uvicorn
 import os
 
@@ -20,7 +20,11 @@ This API provides endpoints for:
     openapi_tags=[
         {
             "name": "proposals",
-            "description": "Operations with proposal drafts, including generation and management.",
+            "description": "Operations with proposal drafts (CRUD).",
+        },
+        {
+            "name": "proposal-generation",
+            "description": "AI-powered proposal generation endpoints (RFP Parsing, Sequential Generation).",
         }
     ]
 )
@@ -40,6 +44,7 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
 # Include Routers
 app.include_router(proposals.router)
+app.include_router(generate.router)
 app.include_router(knowledge.router)
 
 @app.get("/")
