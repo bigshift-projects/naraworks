@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from '@/lib/axios';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Editor from '@/components/Editor';
 import { ChevronLeft, Loader2, Save, Download, Check, FileText } from 'lucide-react';
 import Link from 'next/link';
@@ -56,7 +56,6 @@ const fetchProposal = async (id: string) => {
 
 const updateProposal = async ({ id, title, content, toc, status }: { id: string; title?: string; content?: string; toc?: any[]; status?: string }) => {
     if (id.startsWith('mock-')) {
-        // Mock update - just return success
         return { success: true };
     }
     const { data } = await axios.put(`/api/proposals/${id}`, { title, content, toc, status });
@@ -69,22 +68,14 @@ export default function EditorPage() {
     const router = useRouter();
 
     const [title, setTitle] = useState('');
-    const [content, setContent] = useState(''); // Track content for manual save
+    const [content, setContent] = useState('');
     const [toc, setToc] = useState<any[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const { data: proposal, isLoading, error, refetch } = useQuery({
         queryKey: ['proposal', id],
         queryFn: () => fetchProposal(id),
-        refetchInterval: (data) => {
-            // Poll if still generating
-            if (data?.state?.data?.status === 'generating_sections') {
-                return 3000;
-            }
-            return false;
-        }
     });
 
     const mutation = useMutation({
@@ -99,14 +90,12 @@ export default function EditorPage() {
     useEffect(() => {
         if (proposal) {
             setTitle(proposal.title);
-            // Only update content from server if we are not currently editing or if it's the first load
-            // or if the server status is generating (to show progress)
             if (proposal.status === 'generating_sections' || !content) {
                 setContent(proposal.content);
             }
             if (proposal.toc) setToc(proposal.toc);
         }
-    }, [proposal]);
+    }, [proposal, content]);
 
     // Polling effect for generating status
     useEffect(() => {
@@ -161,7 +150,6 @@ export default function EditorPage() {
             if (res.data.toc && res.data.toc.length > 0) {
                 const newToc = res.data.toc.map((item: any) => ({ ...item, status: 'pending' }));
                 setToc(newToc);
-                // Save immediately
                 mutation.mutate({ id, title, content, toc: newToc, status: 'toc_confirmed' });
             } else {
                 alert('목차 생성에 실패했습니다. PDF에 텍스트가 포함되어 있는지 확인해주세요.');
@@ -176,7 +164,6 @@ export default function EditorPage() {
         const section = toc[index];
         if (!section) return;
 
-        // Update status to generating
         const newToc = [...toc];
         newToc[index] = { ...section, status: 'generating' };
         setToc(newToc);
@@ -187,16 +174,10 @@ export default function EditorPage() {
             });
 
             const generatedContent = res.data.content;
-
-            // Append content
             const newContent = content + `\n\n${generatedContent}`;
             setContent(newContent);
-
-            // Update TOC status
             newToc[index] = { ...section, status: 'done' };
             setToc(newToc);
-
-            // Save immediately
             mutation.mutate({ id, title, content: newContent, toc: newToc });
 
         } catch (e) {
@@ -206,7 +187,6 @@ export default function EditorPage() {
             setToc(newToc);
         }
     };
-
 
     if (isLoading) {
         return (
@@ -229,7 +209,6 @@ export default function EditorPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
-            {/* Editor Header */}
             <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 no-print">
                 <div className="flex items-center gap-4 flex-1">
                     <Link href="/dashboard" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -280,9 +259,7 @@ export default function EditorPage() {
                 </div>
             </header>
 
-            {/* Main Layout with Sidebar */}
             <div className="flex flex-1 max-w-7xl mx-auto w-full">
-                {/* TOC Sidebar */}
                 <aside className="w-80 border-r border-gray-200 bg-white p-6 hidden lg:block h-[calc(100vh-80px)] overflow-y-auto sticky top-[80px]">
                     <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 tracking-wider">목차 (Table of Contents)</h3>
                     <div className="space-y-4">
@@ -296,7 +273,6 @@ export default function EditorPage() {
                                     {section.status === 'done' && <Check className="w-4 h-4 text-green-500 shrink-0" />}
                                 </div>
                                 <p className="text-xs text-gray-400 mb-2 line-clamp-2">{section.description}</p>
-
                                 {(!section.status || section.status === 'pending' || section.status === 'error') && (
                                     <button
                                         onClick={() => handleGenerateSection(idx)}
@@ -308,33 +284,32 @@ export default function EditorPage() {
                             </div>
                         ))}
                         {toc.length === 0 && (
-                            <div className="text-center py-8">
-                                <p className="text-sm text-gray-400 italic mb-4">목차가 없습니다.</p>
-
-                                <input
-                                    type="file"
-                                    id="sidebar-rfp-upload"
-                                    className="hidden"
-                                    accept=".pdf"
-                                    onChange={handleGenerateTOCFromRFP}
-                                />
+                            <div className="py-4">
+                                <input type="file" id="sidebar-rfp-upload" className="hidden" accept=".pdf" onChange={handleGenerateTOCFromRFP} />
                                 <label
                                     htmlFor="sidebar-rfp-upload"
-                                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100 cursor-pointer transition-colors"
+                                    className="flex flex-col items-center justify-center gap-3 px-4 py-8 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl text-center cursor-pointer transition-all shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 active:translate-y-0 active:scale-[0.98] w-full group mb-4"
                                 >
-                                    <FileText className="w-3 h-3" />
-                                    RFP로 목차 생성하기
+                                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors shadow-inner">
+                                        <FileText className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-base font-bold tracking-tight">AI로 초안 작성하기</span>
+                                        <span className="text-[11px] text-blue-100 font-medium">RFP 분석 및 자동 생성</span>
+                                    </div>
                                 </label>
-
-                                <p className="text-xs text-gray-300 mt-2">
-                                    또는 수동으로 작성하세요 (준비중)
-                                </p>
+                                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 border-dashed">
+                                    <p className="text-[12px] text-gray-500 text-center leading-relaxed">
+                                        제안요청서(RFP)를 업로드하시면<br />
+                                        AI가 <span className="text-blue-600 font-semibold">목차 구성부터 본문 초안</span>까지<br />
+                                        한 번에 작성해 드립니다.
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>
                 </aside>
 
-                {/* Editor Content Area */}
                 <main className="flex-1 p-8 md:p-12 w-full relative">
                     {proposal?.status === 'generating_sections' && (
                         <div className="mb-8 p-4 bg-blue-600 text-white rounded-xl shadow-lg flex items-center justify-between animate-pulse">
@@ -347,32 +322,10 @@ export default function EditorPage() {
                             </div>
                         </div>
                     )}
-                    <Editor
-                        id="proposal-content"
-                        initialContent={proposal?.content}
-                        onChange={handleContentChange}
-                    />
+
+                    <Editor id="proposal-content" initialContent={proposal?.content} onChange={handleContentChange} />
                 </main>
             </div>
-
-            <style jsx global>{`
-        @media print {
-          .no-print {
-            display: none !important;
-          }
-          body {
-            background-color: white !important;
-          }
-          main {
-            padding: 0 !important;
-            margin: 0 !important;
-            max-width: none !important;
-          }
-          .prose {
-            max-width: none !important;
-          }
-        }
-      `}</style>
         </div>
     );
 }

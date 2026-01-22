@@ -105,40 +105,6 @@ def structure_toc_from_pages(text_content: str) -> Dict[str, Any]:
         print(f"Error structuring TOC: {e}")
         return {"toc": []}
 
-def generate_proposal_draft(rfp_text: str, notice_text: str) -> dict:
-    """
-    Generates a proposal draft title and content based on RFP and Notice text.
-    Returns a dict with 'title' and 'content'.
-    DEPRECATED: Using simple generation. Future refactor will use sequential generation.
-    """
-    
-    # Simple fallback using direct OpenAI for now, or could use LangChain
-    # For backward compatibility with existing tests/frontend, we keep this simple logic.
-    
-    prompt = f"""
-    You are an expert proposal writer.
-    Based on the following RFP and Notice, write a simple proposal draft.
-    Return JSON with 'title' and 'content' (HTML).
-    
-    [Notice]
-    {notice_text[:2000]}
-    
-    [RFP]
-    {rfp_text[:8000]}
-    """
-    
-    try:
-        response = llm.invoke(prompt)
-        # Parse JSON from content (assuming model obeys)
-        # A more robust way is using JsonOutputParser
-        parser = JsonOutputParser()
-        return parser.parse(response.content)
-    except Exception as e:
-        print(f"Error generating proposal with LLM: {e}")
-        return {
-            "title": "Error Generating Proposal",
-            "content": f"<p>Failed to generate draft. Error: {str(e)}</p>"
-        }
 
 def generate_toc(rfp_text: str) -> dict:
     """

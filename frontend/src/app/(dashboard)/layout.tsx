@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { FileText, Settings, LayoutDashboard, BookOpen } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -6,28 +9,44 @@ export default function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
+    const pathname = usePathname();
+
+    const isActive = (path: string) => pathname === path;
+
     return (
         <div className="flex h-screen bg-gray-50">
             {/* Sidebar */}
             <aside className="w-64 bg-white border-r border-gray-200 hidden md:block">
                 <div className="p-6">
-                    <h1 className="text-2xl font-bold text-blue-600 flex items-center gap-2">
+                    <Link href="/dashboard" className="text-2xl font-bold text-blue-600 flex items-center gap-2 hover:opacity-80 transition-opacity">
                         <FileText className="w-8 h-8" />
                         Naraworks
-                    </h1>
+                    </Link>
                 </div>
                 <nav className="mt-6 px-4 space-y-2">
-                    <Link href="/dashboard" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors">
+                    <Link
+                        href="/dashboard"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors font-medium ${isActive('/dashboard')
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                    >
                         <LayoutDashboard className="w-5 h-5" />
-                        <span className="font-medium">Dashboard</span>
+                        <span>Dashboard</span>
                     </Link>
-                    <Link href="/knowledge" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors">
+                    <Link
+                        href="/knowledge"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors font-medium ${isActive('/knowledge')
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                    >
                         <BookOpen className="w-5 h-5" />
-                        <span className="font-medium">Knowledge</span>
+                        <span>Knowledge</span>
                     </Link>
-                    <button className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-left">
+                    <button className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors text-left font-medium">
                         <Settings className="w-5 h-5" />
-                        <span className="font-medium">Settings</span>
+                        <span>Settings</span>
                     </button>
                 </nav>
                 <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200">
@@ -42,6 +61,7 @@ export default function DashboardLayout({
                     </div>
                 </div>
             </aside>
+
 
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto">
