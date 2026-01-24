@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import axios from '@/lib/axios';
 
 export default function NewProposalPage() {
     const router = useRouter();
@@ -26,14 +27,8 @@ export default function NewProposalPage() {
         formData.append('rfp', file);
 
         try {
-            const res = await fetch('http://localhost:8080/api/proposals/parse-rfp', {
-                method: 'POST',
-                body: formData,
-            });
+            const { data } = await axios.post('/api/generation/parse-rfp', formData);
 
-            if (!res.ok) throw new Error('Failed to parse RFP');
-
-            const data = await res.json();
             if (data.toc) {
                 setToc(data.toc);
                 setOverview(data.overview);
@@ -54,21 +49,14 @@ export default function NewProposalPage() {
     const handleCreate = async () => {
         setStep('creating');
         try {
-            const res = await fetch('http://localhost:8080/api/proposals/generate-sequential', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title,
-                    overview,
-                    toc,
-                    rfp_text: rfpText,
-                    user_id: '00000000-0000-0000-0000-000000000000',
-                }),
+            const { data: proposal } = await axios.post('/api/generation/generate-sequential', {
+                title,
+                overview,
+                toc,
+                rfp_text: rfpText,
+                user_id: '00000000-0000-0000-0000-000000000000',
             });
 
-            if (!res.ok) throw new Error('Failed to start generation');
-
-            const proposal = await res.json();
             // Redirect to editor - editor will show generation status
             router.push(`/editor/${proposal.id}`);
         } catch (e) {

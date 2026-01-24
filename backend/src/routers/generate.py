@@ -11,7 +11,7 @@ from ..services.llm_service import (
 from ..services.proposal_engine import run_sequential_generation
 
 router = APIRouter(
-    prefix="/api/proposals",
+    prefix="/api/generation",
     tags=["proposal-generation"]
 )
 
@@ -102,16 +102,19 @@ async def generate_sequential(req: GenerationRequest, background_tasks: Backgrou
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class SectionGenerationRequest(BaseModel):
+    section_title: str
+
 @router.post(
     "/{id}/generate-section",
     summary="Generate content for a specific section",
     description="Generate draft content for a specific section of the proposal using LLM."
 )
-async def generate_section(id: str, section_title: str):
+async def generate_section(id: str, req: SectionGenerationRequest):
     # In a real app, we would fetch the proposal to get the RFP context (if linked) 
     # or accept context in the request body.
     # For now, we will perform a simple generation. 
     # TODO: Fetch RFP text associated with this proposal if possible.
     
-    content = generate_section_content(section_title)
+    content = generate_section_content(req.section_title)
     return {"content": content}

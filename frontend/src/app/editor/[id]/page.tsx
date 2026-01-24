@@ -163,7 +163,7 @@ export default function EditorPage() {
 
         try {
             // alert('RFP 분석 중입니다. 잠시만 기다려주세요...'); // Removed alert to avoid blocking UI update
-            const res = await axios.post('/api/proposals/parse-rfp', formData);
+            const res = await axios.post('/api/generation/parse-rfp', formData);
 
             if (res.data.toc && res.data.toc.length > 0) {
                 const newToc = res.data.toc.map((item: any) => ({ ...item, status: 'pending' }));
@@ -196,7 +196,7 @@ export default function EditorPage() {
         setToc(newToc);
 
         try {
-            const res = await axios.post(`/api/proposals/${id}/generate-section`, {
+            const res = await axios.post(`/api/generation/${id}/generate-section`, {
                 section_title: section.title
             });
 
