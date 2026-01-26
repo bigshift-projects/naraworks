@@ -75,7 +75,9 @@ trigger: always_on
 ### Step 2: 지능형 목차 파악 및 구조화 (Step 3 & 4)
 * **개발 목표:** 수백 페이지 중 '목차' 페이지만 정확히 찾아내어 JSON으로 구조화
 * **구현 상세:**
-    * **Filtering (비용 절감):** 모든 페이지를 LLM에 넣기 전, '목차', '차례', 'Contents', '작성 지침' 등의 키워드가 있는 페이지만 1차 필터링하여 LLM 호출 횟수 감소.
+    * **Filtering (비용 절감):** 
+        * **Page Exclusion:** PDF의 1~3페이지는 PDF 자체의 목차일 가능성이 높으므로 분석 대상에서 원천 제외.
+        * **Keyword Filtering:** 나머지 페이지 중 '목차', '차례', 'Contents', '작성 지침' 등의 키워드가 있는 페이지만 1차 필터링하여 LLM 호출 횟수 감소.
     * **Classification Prompt:** 해당 페이지가 실제 제안서의 구조를 설명하는 페이지인지 판단. (단순 문서 목차가 아닌, '제안서 작성 목차'인지 구분이 핵심)
     * **Structure Prompt:** 추출된 텍스트를 대분류/중분류/작성지침(Guideline)으로 나누어 JSON 리턴하도록 Few-shot Prompting 적용.
 

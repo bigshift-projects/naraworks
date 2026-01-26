@@ -149,6 +149,10 @@ export default function NewProposalPage() {
                                     <p className="text-gray-800 bg-white p-2 rounded border border-blue-100">{overview?.budget || '-'}</p>
                                 </div>
                                 <div className="col-span-2">
+                                    <span className="text-blue-600 font-semibold block mb-1">사업 개요 (요약)</span>
+                                    <p className="text-gray-800 bg-white p-2 rounded border border-blue-100 whitespace-pre-wrap">{overview?.project_summary || '-'}</p>
+                                </div>
+                                <div className="col-span-2">
                                     <span className="text-blue-600 font-semibold block mb-1">주요 과업</span>
                                     <ul className="list-disc list-inside bg-white p-3 rounded border border-blue-100 space-y-1">
                                         {overview?.key_objectives?.map((obj: string, i: number) => (

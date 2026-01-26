@@ -11,9 +11,11 @@ interface StepProgressProps {
     };
     // The extracted overview data to display
     overviewData?: {
-        projectName?: string;
+        project_name?: string;
         period?: string;
         budget?: string;
+        key_objectives?: string[]; // Major Tasks
+        project_summary?: string; // 10-line summary
         [key: string]: any;
     };
 }
@@ -82,20 +84,43 @@ export default function StepProgress({ step, status, overviewData }: StepProgres
                     {/* Extracted Overview Details */}
                     {status.overviewExtracted && overviewData && isOverviewExpanded && (
                         <div className="px-4 pb-4 animate-in slide-in-from-top-2 fade-in duration-300">
-                            <div className="bg-white rounded-md border border-blue-100 p-3 text-xs space-y-2">
-                                <div>
-                                    <span className="text-gray-500 block mb-0.5">사업명</span>
-                                    <span className="font-medium text-gray-900">{overviewData.projectName || '-'}</span>
+                            <div className="bg-white rounded-md border border-blue-100 p-3 text-xs space-y-3">
+                                {/* Basic Info */}
+                                <div className="space-y-2 pb-2 border-b border-gray-100">
+                                    <div>
+                                        <span className="text-gray-500 block mb-0.5">사업명</span>
+                                        <span className="font-medium text-gray-900">{overviewData.project_name || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <span className="text-gray-500 block mb-0.5">예산</span>
+                                            <span className="font-medium text-gray-900">{overviewData.budget || '-'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-500 block mb-0.5">기간</span>
+                                            <span className="font-medium text-gray-900">{overviewData.period || '-'}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <span className="text-gray-500 block mb-0.5">예산</span>
-                                        <span className="font-medium text-gray-900">{overviewData.budget || '-'}</span>
+
+                                {/* Project Summary */}
+                                {overviewData.project_summary && (
+                                    <div className="pb-2 border-b border-gray-100">
+                                        <span className="text-gray-500 block mb-1">사업 개요 (요약)</span>
+                                        <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                            {overviewData.project_summary}
+                                        </p>
                                     </div>
-                                    <div>
-                                        <span className="text-gray-500 block mb-0.5">기간</span>
-                                        <span className="font-medium text-gray-900">{overviewData.period || '-'}</span>
-                                    </div>
+                                )}
+
+                                {/* Major Tasks */}
+                                <div>
+                                    <span className="text-gray-500 block mb-1">주요 과업</span>
+                                    <ul className="list-disc list-inside space-y-1 text-gray-700">
+                                        {overviewData.key_objectives?.map((obj, i) => (
+                                            <li key={i} className="leading-tight">{obj}</li>
+                                        )) || <li className="text-gray-400 italic">추출된 과업 없음</li>}
+                                    </ul>
                                 </div>
                             </div>
                         </div>
