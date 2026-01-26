@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.naraworks_proposals (
     title TEXT NOT NULL,
     content TEXT,
     toc JSONB,
+    overview JSONB,
     status TEXT DEFAULT 'draft' NOT NULL,
     user_id UUID NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,

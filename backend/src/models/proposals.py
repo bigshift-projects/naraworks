@@ -14,6 +14,7 @@ class ProposalBase(BaseModel):
     title: str = Field(..., description="The title of the proposal draft", example="2024 AI Voucher Project Proposal")
     content: Optional[Any] = Field(None, description="The HTML content of the proposal draft", example="<h1>Proposal</h1><p>Content goes here...</p>")
     toc: Optional[List[Dict[str, Any]]] = Field(None, description="The table of contents for the proposal", example=[{"title": "1. Introduction", "status": "pending"}])
+    overview: Optional[Dict[str, Any]] = Field(None, description="Project overview data extracted from RFP")
     status: ProposalStatus = Field(ProposalStatus.DRAFT, description="The current status of the proposal workflow")
     user_id: str = Field(..., description="The ID of the user who owns the proposal", example="00000000-0000-0000-0000-000000000000")
 
@@ -24,6 +25,7 @@ class ProposalUpdate(BaseModel):
     title: Optional[str] = Field(None, description="Updated title of the proposal", example="Updated Proposal Title")
     content: Optional[Any] = Field(None, description="Updated HTML content of the proposal", example="<h2>Updated Content</h2>")
     toc: Optional[List[Dict[str, Any]]] = Field(None, description="Updated table of contents")
+    overview: Optional[Dict[str, Any]] = Field(None, description="Updated project overview data")
     status: Optional[ProposalStatus] = Field(None, description="Updated status of the proposal")
 
 class Proposal(ProposalBase):

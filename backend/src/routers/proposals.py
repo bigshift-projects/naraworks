@@ -68,6 +68,7 @@ async def create_proposal(proposal: ProposalCreate):
             "content": proposal.content,
             "user_id": proposal.user_id,
             "toc": proposal.toc,
+            "overview": proposal.overview,
             "status": proposal.status
         }
         response = supabase.table("naraworks_proposals").insert(data).execute()
@@ -125,6 +126,8 @@ async def update_proposal(id: str, proposal: ProposalUpdate):
         update_data["content"] = proposal.content
     if proposal.toc is not None:
         update_data["toc"] = proposal.toc
+    if proposal.overview is not None:
+        update_data["overview"] = proposal.overview
     if proposal.status is not None:
         update_data["status"] = proposal.status
     

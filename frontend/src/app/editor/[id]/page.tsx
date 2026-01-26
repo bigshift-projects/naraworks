@@ -28,6 +28,7 @@ interface Proposal {
     status: string;
     updated_at: string;
     toc?: TOCChapter[];
+    overview?: any;
 }
 
 const MOCK_PROPOSAL_DETAILS: Record<string, Proposal> = {
@@ -40,6 +41,13 @@ const MOCK_PROPOSAL_DETAILS: Record<string, Proposal> = {
         `,
         updated_at: new Date().toISOString(),
         status: 'draft',
+        overview: {
+            project_name: "[목업] 2024년도 AI 바우처 지원사업",
+            budget: "2.5억원",
+            period: "2024.03 ~ 2024.12",
+            project_summary: "본 사업은 중소기업의 AI 도입을 지원하는 바우처 사업입니다.",
+            key_objectives: ["AI 솔루션 도입 지원", "인프라 구축", "데이터 가공 서비스"]
+        },
         toc: [
             {
                 chapter_title: "I. 사업 개요",
@@ -62,11 +70,11 @@ const fetchProposal = async (id: string) => {
     return data;
 };
 
-const updateProposal = async ({ id, title, content, toc, status }: { id: string; title?: string; content?: string; toc?: any[]; status?: string }) => {
+const updateProposal = async ({ id, title, content, toc, status, overview }: { id: string; title?: string; content?: string; toc?: any[]; status?: string; overview?: any }) => {
     if (id.startsWith('mock-')) {
         return { success: true };
     }
-    const { data } = await axios.put(`/api/proposals/${id}`, { title, content, toc, status });
+    const { data } = await axios.put(`/api/proposals/${id}`, { title, content, toc, status, overview });
     return data;
 };
 
@@ -122,6 +130,10 @@ export default function EditorPage() {
                     setStepStatus(prev => ({ ...prev, pdfUploaded: true, overviewExtracted: true }));
                 }
             }
+            if (proposal.overview) {
+                setOverviewData(proposal.overview);
+                setStepStatus(prev => ({ ...prev, pdfUploaded: true, overviewExtracted: true }));
+            }
         }
     }, [proposal, content]);
 
@@ -132,7 +144,7 @@ export default function EditorPage() {
     const handleSave = async () => {
         if (!proposal) return;
         setIsSaving(true);
-        mutation.mutate({ id, title, content });
+        mutation.mutate({ id, title, content, toc, overview: overviewData });
     };
 
     const handleExportPDF = async () => {
@@ -182,7 +194,7 @@ export default function EditorPage() {
                     setStepStatus(prev => ({ ...prev, overviewExtracted: true }));
                 }
 
-                mutation.mutate({ id, title, content, toc: newToc, status: 'toc_confirmed' });
+                mutation.mutate({ id, title, content, toc: newToc, overview: res.data.overview, status: 'toc_confirmed' });
             } else {
                 alert('목차 생성에 실패했습니다. PDF에 텍스트가 포함되어 있는지 확인해주세요.');
                 setStepStatus(prev => ({ ...prev, pdfUploaded: false })); // Reset on failure
@@ -378,8 +390,17 @@ export default function EditorPage() {
                 {/* Sidebar (Split Layout) */}
                 <aside className="w-80 border-r border-gray-200 bg-white flex flex-col h-[calc(100vh-80px)] sticky top-[80px]">
 
-                    {/* Top Hand: TOC (Flexible height) */}
-                    <div className="flex-1 overflow-y-auto p-6 min-h-[300px]">
+                    {/* Top Hand: Step Progress & Overview (Fixed/Flexible) */}
+                    <div className="border-b border-gray-200 bg-gray-50/50">
+                        <StepProgress
+                            step={currentStep}
+                            status={stepStatus}
+                            overviewData={overviewData}
+                        />
+                    </div>
+
+                    {/* Bottom Half: TOC (Flexible height) */}
+                    <div className="flex-1 overflow-y-auto p-6">
                         <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 tracking-wider">목차 (Table of Contents)</h3>
                         <div className="space-y-4">
                             {toc.map((chapter, cIdx) => (
@@ -496,14 +517,6 @@ export default function EditorPage() {
                         </div>
                     </div>
 
-                    {/* Bottom Half: Step Progress (Fixed/Flexible) */}
-                    <div className="h-1/3 min-h-[250px] border-t border-gray-200">
-                        <StepProgress
-                            step={currentStep}
-                            status={stepStatus}
-                            overviewData={overviewData}
-                        />
-                    </div>
                 </aside>
 
                 <main className="flex-1 p-8 pt-4 w-full relative">
