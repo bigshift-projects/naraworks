@@ -9,5 +9,4 @@ python-multipart
 tiktoken
 langchain
 langchain-openai
-langgraph
 pymupdf

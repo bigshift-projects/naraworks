@@ -6,7 +6,7 @@ import axios from '@/lib/axios';
 import { useState, useEffect, useCallback } from 'react';
 import Editor from '@/components/Editor';
 import StepProgress from '@/components/StepProgress';
-import { ChevronLeft, Loader2, Save, Download, Check, FileText } from 'lucide-react';
+import { ChevronLeft, Loader2, Save, Download, Check, FileText, Pencil, Trash, X } from 'lucide-react';
 import Link from 'next/link';
 
 interface TOCSubSection {
@@ -81,6 +81,12 @@ export default function EditorPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
+    // Editing State
+    const [editingChapterIdx, setEditingChapterIdx] = useState<number | null>(null);
+    const [editingSection, setEditingSection] = useState<{ cIdx: number, sIdx: number } | null>(null);
+    const [editValue, setEditValue] = useState("");
+    const [editGuideline, setEditGuideline] = useState("");
+
     // Progress State
     const [currentStep, setCurrentStep] = useState(1);
     const [stepStatus, setStepStatus] = useState({
@@ -106,7 +112,7 @@ export default function EditorPage() {
     useEffect(() => {
         if (proposal) {
             setTitle(proposal.title);
-            if (proposal.status === 'generating_sections' || !content) {
+            if (!content) {
                 setContent(proposal.content);
             }
             if (proposal.toc) {
@@ -118,19 +124,6 @@ export default function EditorPage() {
             }
         }
     }, [proposal, content]);
-
-    // Polling effect for generating status
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (proposal?.status === 'generating_sections') {
-            interval = setInterval(() => {
-                refetch();
-            }, 3000);
-        }
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [proposal?.status, refetch]);
 
     const handleContentChange = useCallback((newContent: string) => {
         setContent(newContent);
@@ -164,6 +157,7 @@ export default function EditorPage() {
         const file = e.target.files[0];
         const formData = new FormData();
         formData.append('rfp', file);
+        formData.append('proposal_id', id);
 
         // Update status: PDF Uploaded
         setStepStatus(prev => ({ ...prev, pdfUploaded: true }));
@@ -239,6 +233,73 @@ export default function EditorPage() {
             alert('섹션 생성 실패');
             section.status = 'error';
             setToc(newToc);
+        }
+    };
+
+    // --- TOC Editing Handlers ---
+
+    const updateTocAndSave = (newToc: TOCChapter[]) => {
+        setToc(newToc);
+        mutation.mutate({ id, title, content, toc: newToc });
+    };
+
+    // Chapter Actions
+    const startEditChapter = (idx: number) => {
+        setEditingChapterIdx(idx);
+        setEditValue(toc[idx].chapter_title);
+        setEditingSection(null);
+    };
+
+    const saveEditChapter = (idx: number) => {
+        if (!editValue.trim()) return;
+        const newToc = [...toc];
+        newToc[idx] = { ...newToc[idx], chapter_title: editValue };
+        updateTocAndSave(newToc);
+        setEditingChapterIdx(null);
+    };
+
+    const deleteChapter = (idx: number) => {
+        if (confirm('대분류를 삭제하시겠습니까? 포함된 모든 소제목도 함께 삭제됩니다.')) {
+            const newToc = toc.filter((_, i) => i !== idx);
+            updateTocAndSave(newToc);
+        }
+    };
+
+    // Section Actions
+    const startEditSection = (cIdx: number, sIdx: number) => {
+        setEditingSection({ cIdx, sIdx });
+        const section = toc[cIdx].sub_sections[sIdx];
+        setEditValue(section.title);
+        setEditGuideline(section.guideline || "");
+        setEditingChapterIdx(null);
+    };
+
+    const saveEditSection = (cIdx: number, sIdx: number) => {
+        if (!editValue.trim()) return;
+        const newToc = [...toc];
+        const newChapter = { ...newToc[cIdx] };
+        const newSections = [...newChapter.sub_sections];
+
+        newSections[sIdx] = {
+            ...newSections[sIdx],
+            title: editValue,
+            guideline: editGuideline
+        };
+
+        newChapter.sub_sections = newSections;
+        newToc[cIdx] = newChapter;
+
+        updateTocAndSave(newToc);
+        setEditingSection(null);
+    };
+
+    const deleteSection = (cIdx: number, sIdx: number) => {
+        if (confirm('이 항목을 삭제하시겠습니까?')) {
+            const newToc = [...toc];
+            const newChapter = { ...newToc[cIdx] };
+            newChapter.sub_sections = newChapter.sub_sections.filter((_, i) => i !== sIdx);
+            newToc[cIdx] = newChapter;
+            updateTocAndSave(newToc);
         }
     };
 
@@ -323,29 +384,85 @@ export default function EditorPage() {
                         <div className="space-y-4">
                             {toc.map((chapter, cIdx) => (
                                 <div key={cIdx} className="mb-6">
-                                    <h4 className="text-sm font-bold text-gray-800 mb-3 px-2 border-l-4 border-gray-200 pl-2">
-                                        {chapter.chapter_title}
-                                    </h4>
+                                    {/* Chapter Header with Edit Mode */}
+                                    <div className="group/chapter flex items-center justify-between mb-3 px-2 border-l-4 border-gray-200 pl-2 min-h-[28px]">
+                                        {editingChapterIdx === cIdx ? (
+                                            <div className="flex items-center gap-2 w-full">
+                                                <input
+                                                    type="text"
+                                                    value={editValue}
+                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                    className="flex-1 text-sm font-bold border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                                    autoFocus
+                                                />
+                                                <button onClick={() => saveEditChapter(cIdx)} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check size={14} /></button>
+                                                <button onClick={() => setEditingChapterIdx(null)} className="p-1 text-red-500 hover:bg-red-50 rounded"><X size={14} /></button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <h4 className="text-sm font-bold text-gray-800 break-words flex-1 pr-2">
+                                                    {chapter.chapter_title}
+                                                </h4>
+                                                <div className="flex items-center gap-1 opacity-0 group-hover/chapter:opacity-100 transition-opacity">
+                                                    <button onClick={() => startEditChapter(cIdx)} className="p-1 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded transition-colors" title="수정"><Pencil size={12} /></button>
+                                                    <button onClick={() => deleteChapter(cIdx)} className="p-1 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded transition-colors" title="삭제"><Trash size={12} /></button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+
                                     <div className="space-y-3 pl-2">
                                         {chapter.sub_sections && chapter.sub_sections.map((section, sIdx) => (
-                                            <div key={sIdx} className={`group p-3 rounded-lg border transition-all ${section.status === 'generating' ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-sm'}`}>
-                                                <div className="flex items-start justify-between gap-2 mb-1">
-                                                    <span className={`text-sm font-medium leading-tight ${section.status === 'generating' ? 'text-blue-700' : 'text-gray-700'}`}>
-                                                        {section.title}
-                                                    </span>
-                                                    {section.status === 'generating' && <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />}
-                                                    {section.status === 'done' && <Check className="w-4 h-4 text-green-500 shrink-0" />}
-                                                </div>
-                                                {section.guideline && (
-                                                    <p className="text-xs text-gray-400 mb-2 line-clamp-2 leading-relaxed">{section.guideline}</p>
-                                                )}
-                                                {(!section.status || section.status === 'pending' || section.status === 'error') && (
-                                                    <button
-                                                        onClick={() => handleGenerateSection(cIdx, sIdx)}
-                                                        className="w-full mt-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-white hover:bg-blue-600 bg-blue-50 py-1.5 rounded transition-all"
-                                                    >
-                                                        <span className="text-[10px]">✨</span> 생성하기
-                                                    </button>
+                                            <div key={sIdx} className={`group relative p-3 rounded-lg border transition-all ${section.status === 'generating' ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-sm'}`}>
+
+                                                {/* Section Edit Mode */}
+                                                {editingSection?.cIdx === cIdx && editingSection?.sIdx === sIdx ? (
+                                                    <div className="flex flex-col gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={editValue}
+                                                            onChange={(e) => setEditValue(e.target.value)}
+                                                            className="text-sm font-medium border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-100 w-full"
+                                                            placeholder="목차 제목"
+                                                            autoFocus
+                                                        />
+                                                        <textarea
+                                                            value={editGuideline}
+                                                            onChange={(e) => setEditGuideline(e.target.value)}
+                                                            className="text-xs text-gray-600 border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-300 w-full min-h-[60px]"
+                                                            placeholder="작성 지침 (Guideline)"
+                                                        />
+                                                        <div className="flex justify-end gap-2 mt-1">
+                                                            <button onClick={() => setEditingSection(null)} className="px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded">취소</button>
+                                                            <button onClick={() => saveEditSection(cIdx, sIdx)} className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">저장</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-md shadow-sm border border-gray-100 p-0.5 z-10">
+                                                            <button onClick={() => startEditSection(cIdx, sIdx)} className="p-1 text-gray-400 hover:text-blue-600 hover:bg-gray-50 rounded" title="수정"><Pencil size={11} /></button>
+                                                            <button onClick={() => deleteSection(cIdx, sIdx)} className="p-1 text-gray-400 hover:text-red-500 hover:bg-gray-50 rounded" title="삭제"><Trash size={11} /></button>
+                                                        </div>
+
+                                                        <div className="flex items-start justify-between gap-2 mb-1 pr-6">
+                                                            <span className={`text-sm font-medium leading-tight ${section.status === 'generating' ? 'text-blue-700' : 'text-gray-700'}`}>
+                                                                {section.title}
+                                                            </span>
+                                                            {section.status === 'generating' && <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />}
+                                                            {section.status === 'done' && <Check className="w-4 h-4 text-green-500 shrink-0" />}
+                                                        </div>
+                                                        {section.guideline && (
+                                                            <p className="text-xs text-gray-400 mb-2 line-clamp-2 leading-relaxed whitespace-pre-line">{section.guideline}</p>
+                                                        )}
+                                                        {(!section.status || section.status === 'pending' || section.status === 'error') && (
+                                                            <button
+                                                                onClick={() => handleGenerateSection(cIdx, sIdx)}
+                                                                className="w-full mt-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-white hover:bg-blue-600 bg-blue-50 py-1.5 rounded transition-all"
+                                                            >
+                                                                <span className="text-[10px]">✨</span> 생성하기
+                                                            </button>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         ))}
@@ -390,17 +507,6 @@ export default function EditorPage() {
                 </aside>
 
                 <main className="flex-1 p-8 pt-4 w-full relative">
-                    {/* {proposal?.status === 'generating_sections' && (
-                        <div className="mb-8 p-4 bg-blue-600 text-white rounded-xl shadow-lg flex items-center justify-between animate-pulse">
-                            <div className="flex items-center gap-3">
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                                <span className="font-medium">AI가 실시간으로 제안서를 작성하고 있습니다... (3초마다 자동 갱신)</span>
-                            </div>
-                            <div className="text-sm bg-blue-700 px-3 py-1 rounded-full">
-                                {toc.reduce((acc, ch) => acc + (ch.sub_sections ? ch.sub_sections.filter(s => s.status === 'done').length : 0), 0)} / {toc.reduce((acc, ch) => acc + (ch.sub_sections ? ch.sub_sections.length : 0), 0)} 완료
-                            </div>
-                        </div>
-                    )} */}
 
                     <Editor id="proposal-content" initialContent={proposal?.content} onChange={handleContentChange} />
                 </main>

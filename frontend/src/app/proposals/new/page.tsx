@@ -12,6 +12,7 @@ export default function NewProposalPage() {
     const [overview, setOverview] = useState<any>(null);
     const [rfpText, setRfpText] = useState('');
     const [title, setTitle] = useState('');
+    const [proposalId, setProposalId] = useState<string | null>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -23,10 +24,22 @@ export default function NewProposalPage() {
         if (!file) return;
         setStep('parsing');
 
-        const formData = new FormData();
-        formData.append('rfp', file);
-
         try {
+            // 1. Create a placeholder proposal first
+            const { data: newProposal } = await axios.post('/api/proposals', {
+                title: file.name.replace('.pdf', '') + ' (분석 중)',
+                content: '',
+                user_id: '00000000-0000-0000-0000-000000000000',
+            });
+
+            const pId = newProposal.id;
+            setProposalId(pId);
+
+            // 2. Parse RFP with the proposal ID
+            const formData = new FormData();
+            formData.append('rfp', file);
+            formData.append('proposal_id', pId);
+
             const { data } = await axios.post('/api/generation/parse-rfp', formData);
 
             if (data.toc) {
@@ -34,7 +47,7 @@ export default function NewProposalPage() {
                 setOverview(data.overview);
                 setRfpText(data.rfp_text);
                 setStep('review');
-                setTitle(file.name.replace('.pdf', '') + ' 제안서');
+                setTitle(data.overview?.project_name || file.name.replace('.pdf', '') + ' 제안서');
             } else {
                 alert('Could not generate TOC');
                 setStep('upload');
@@ -49,16 +62,29 @@ export default function NewProposalPage() {
     const handleCreate = async () => {
         setStep('creating');
         try {
-            const { data: proposal } = await axios.post('/api/generation/generate-sequential', {
-                title,
-                overview,
-                toc,
-                rfp_text: rfpText,
-                user_id: '00000000-0000-0000-0000-000000000000',
-            });
+            let pId = proposalId;
 
-            // Redirect to editor - editor will show generation status
-            router.push(`/editor/${proposal.id}`);
+            if (!pId) {
+                // If it was a "skip" (blank proposal)
+                const { data: newProposal } = await axios.post('/api/proposals', {
+                    title: title || '새 제안서',
+                    content: '',
+                    user_id: '00000000-0000-0000-0000-000000000000',
+                    toc: toc,
+                    status: 'toc_generated'
+                });
+                pId = newProposal.id;
+            } else {
+                // Update existing proposal with final TOC and title
+                await axios.put(`/api/proposals/${pId}`, {
+                    title,
+                    toc,
+                    status: 'toc_generated'
+                });
+            }
+
+            // Redirect to editor
+            router.push(`/editor/${pId}`);
         } catch (e) {
             console.error(e);
             alert('Error creating proposal');

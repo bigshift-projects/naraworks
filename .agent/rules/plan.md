@@ -17,7 +17,7 @@ trigger: always_on
 
 ### 2.1. Tech Stack (권장)
 * **Frontend:** React (TypeScript) - 복잡한 제안서 에디팅 및 실시간 생성 상태 시각화
-* **Backend:** Python (FastAPI 또는 Django) - 비동기 처리 및 LLM 라이브러리 호환성 우수
+* **Backend:** Python (FastAPI) - 비동기 처리 및 LLM 라이브러리 호환성 우수
 * **LLM Framework:** LangChain / LangGraph - 복잡한 순차적 생성 로직 및 상태 관리(State Management)에 필수
 * **PDF Parsing:** PyMuPDF (fitz) 또는 OCR 솔루션 (Upstage Document Parse 등 고성능 파서 권장)
 * **Database:** * RDB (PostgreSQL): 사용자 정보, 프로젝트 메타데이터, 생성된 제안서 텍스트 저장
@@ -72,7 +72,7 @@ trigger: always_on
     * PDF 파서 선정: 표(Table) 데이터가 많은 제안요청서 특성상, 단순 텍스트 추출보다 Layout을 보존하는 파서(e.g., LlamaParse, Upstage 등) 사용 고려. 비용 절감을 위해 PyMuPDF로 1차 시도.
     * **사업개요 추출 프롬프트 최적화:** "사업명", "사업기간", "예산", "주요 과업" 등 핵심 키워드가 반드시 포함되도록 지시.
 
-### Step 2: 지능형 목차 파악 및 구조화 (Step 3 & 4)
+### Step 2: 지능형 목차 파악 및 구조화
 * **개발 목표:** 수백 페이지 중 '목차' 페이지만 정확히 찾아내어 JSON으로 구조화
 * **구현 상세:**
     * **Filtering (비용 절감):** 
