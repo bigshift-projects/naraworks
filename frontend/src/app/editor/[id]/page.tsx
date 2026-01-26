@@ -9,13 +9,25 @@ import StepProgress from '@/components/StepProgress';
 import { ChevronLeft, Loader2, Save, Download, Check, FileText } from 'lucide-react';
 import Link from 'next/link';
 
+interface TOCSubSection {
+    title: string;
+    guideline?: string;
+    status?: string; // 'pending' | 'generating' | 'done' | 'error'
+    content?: string;
+}
+
+interface TOCChapter {
+    chapter_title: string;
+    sub_sections: TOCSubSection[];
+}
+
 interface Proposal {
     id: string;
     title: string;
     content: string;
     status: string;
     updated_at: string;
-    toc?: { title: string; description?: string; status?: string }[];
+    toc?: TOCChapter[];
 }
 
 const MOCK_PROPOSAL_DETAILS: Record<string, Proposal> = {
@@ -25,23 +37,18 @@ const MOCK_PROPOSAL_DETAILS: Record<string, Proposal> = {
         content: `
 <h1>2024년도 AI 바우처 지원사업 제안서</h1>
 <p>이것은 서버 에러 시 표시되는 <strong>목업 데이터</strong>입니다.</p>
-<h2>1. 사업 개요</h2>
-<p>본 사업은 중소기업의 AI 도입을 지원하기 위한 바우처 사업입니다.</p>
-<h2>2. 수행 계획</h2>
-<p>최신 LLM 기술을 활용하여 업무 자동화를 실현합니다.</p>
         `,
         updated_at: new Date().toISOString(),
         status: 'draft',
-    },
-    'mock-2': {
-        id: 'mock-2',
-        title: '[목업] 공공 클라우드 전환 컨설팅 사업 제안서',
-        content: `
-<h1>공공 클라우드 전환 컨설팅 사업 제안서</h1>
-<p>공공 부문의 안정적인 클라우드 전환을 위한 컨설팅을 제공합니다.</p>
-        `,
-        updated_at: new Date(Date.now() - 86400000).toISOString(),
-        status: 'draft',
+        toc: [
+            {
+                chapter_title: "I. 사업 개요",
+                sub_sections: [
+                    { title: "1. 사업의 목적", guideline: "사업 목적 기술", status: "done" },
+                    { title: "2. 추진 배경", guideline: "배경 기술", status: "pending" }
+                ]
+            }
+        ]
     },
 };
 
@@ -70,7 +77,7 @@ export default function EditorPage() {
 
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
-    const [toc, setToc] = useState<any[]>([]);
+    const [toc, setToc] = useState<TOCChapter[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
@@ -166,7 +173,13 @@ export default function EditorPage() {
             const res = await axios.post('/api/generation/parse-rfp', formData);
 
             if (res.data.toc && res.data.toc.length > 0) {
-                const newToc = res.data.toc.map((item: any) => ({ ...item, status: 'pending' }));
+                const newToc = res.data.toc.map((chapter: any) => ({
+                    ...chapter,
+                    sub_sections: chapter.sub_sections ? chapter.sub_sections.map((sub: any) => ({
+                        ...sub,
+                        status: 'pending'
+                    })) : []
+                }));
                 setToc(newToc);
 
                 // Update Overview Data & Status
@@ -187,12 +200,19 @@ export default function EditorPage() {
         }
     };
 
-    const handleGenerateSection = async (index: number) => {
-        const section = toc[index];
-        if (!section) return;
+    const handleGenerateSection = async (chapterIdx: number, sectionIdx: number) => {
+        const chapter = toc[chapterIdx];
+        if (!chapter || !chapter.sub_sections[sectionIdx]) return;
 
         const newToc = [...toc];
-        newToc[index] = { ...section, status: 'generating' };
+        // Create deep copy for nested update
+        newToc[chapterIdx] = {
+            ...chapter,
+            sub_sections: [...chapter.sub_sections]
+        };
+        const section = newToc[chapterIdx].sub_sections[sectionIdx];
+
+        section.status = 'generating';
         setToc(newToc);
 
         try {
@@ -201,16 +221,23 @@ export default function EditorPage() {
             });
 
             const generatedContent = res.data.content;
-            const newContent = content + `\n\n${generatedContent}`;
+
+            // Append content with header 
+            // Optional: You might want to format this better or let the backend handle everything
+            const newContentSection = `\n\n<h3>${section.title}</h3>\n${generatedContent}`;
+            const newContent = content + newContentSection;
+
             setContent(newContent);
-            newToc[index] = { ...section, status: 'done' };
+
+            section.status = 'done';
             setToc(newToc);
+
             mutation.mutate({ id, title, content: newContent, toc: newToc });
 
         } catch (e) {
             console.error(e);
             alert('섹션 생성 실패');
-            newToc[index] = { ...section, status: 'error' };
+            section.status = 'error';
             setToc(newToc);
         }
     };
@@ -294,24 +321,35 @@ export default function EditorPage() {
                     <div className="flex-1 overflow-y-auto p-6 min-h-[300px]">
                         <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 tracking-wider">목차 (Table of Contents)</h3>
                         <div className="space-y-4">
-                            {toc.map((section, idx) => (
-                                <div key={idx} className={`group p-2 rounded-lg transition-colors ${section.status === 'generating' ? 'bg-blue-50 border border-blue-100' : 'hover:bg-gray-50'}`}>
-                                    <div className="flex items-start justify-between gap-2 mb-1">
-                                        <span className={`text-sm font-medium leading-tight ${section.status === 'generating' ? 'text-blue-700' : 'text-gray-800'}`}>
-                                            {section.title}
-                                        </span>
-                                        {section.status === 'generating' && <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />}
-                                        {section.status === 'done' && <Check className="w-4 h-4 text-green-500 shrink-0" />}
+                            {toc.map((chapter, cIdx) => (
+                                <div key={cIdx} className="mb-6">
+                                    <h4 className="text-sm font-bold text-gray-800 mb-3 px-2 border-l-4 border-gray-200 pl-2">
+                                        {chapter.chapter_title}
+                                    </h4>
+                                    <div className="space-y-3 pl-2">
+                                        {chapter.sub_sections && chapter.sub_sections.map((section, sIdx) => (
+                                            <div key={sIdx} className={`group p-3 rounded-lg border transition-all ${section.status === 'generating' ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-sm'}`}>
+                                                <div className="flex items-start justify-between gap-2 mb-1">
+                                                    <span className={`text-sm font-medium leading-tight ${section.status === 'generating' ? 'text-blue-700' : 'text-gray-700'}`}>
+                                                        {section.title}
+                                                    </span>
+                                                    {section.status === 'generating' && <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />}
+                                                    {section.status === 'done' && <Check className="w-4 h-4 text-green-500 shrink-0" />}
+                                                </div>
+                                                {section.guideline && (
+                                                    <p className="text-xs text-gray-400 mb-2 line-clamp-2 leading-relaxed">{section.guideline}</p>
+                                                )}
+                                                {(!section.status || section.status === 'pending' || section.status === 'error') && (
+                                                    <button
+                                                        onClick={() => handleGenerateSection(cIdx, sIdx)}
+                                                        className="w-full mt-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-white hover:bg-blue-600 bg-blue-50 py-1.5 rounded transition-all"
+                                                    >
+                                                        <span className="text-[10px]">✨</span> 생성하기
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                    <p className="text-xs text-gray-400 mb-2 line-clamp-2">{section.description}</p>
-                                    {(!section.status || section.status === 'pending' || section.status === 'error') && (
-                                        <button
-                                            onClick={() => handleGenerateSection(idx)}
-                                            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
-                                        >
-                                            <span className="text-[10px]">✨</span> 생성하기
-                                        </button>
-                                    )}
                                 </div>
                             ))}
                             {toc.length === 0 && (
@@ -351,18 +389,18 @@ export default function EditorPage() {
                     </div>
                 </aside>
 
-                <main className="flex-1 p-8 md:p-12 w-full relative">
-                    {proposal?.status === 'generating_sections' && (
+                <main className="flex-1 p-8 pt-4 w-full relative">
+                    {/* {proposal?.status === 'generating_sections' && (
                         <div className="mb-8 p-4 bg-blue-600 text-white rounded-xl shadow-lg flex items-center justify-between animate-pulse">
                             <div className="flex items-center gap-3">
                                 <Loader2 className="w-5 h-5 animate-spin" />
                                 <span className="font-medium">AI가 실시간으로 제안서를 작성하고 있습니다... (3초마다 자동 갱신)</span>
                             </div>
                             <div className="text-sm bg-blue-700 px-3 py-1 rounded-full">
-                                {toc.filter(s => s.status === 'done').length} / {toc.length} 완료
+                                {toc.reduce((acc, ch) => acc + (ch.sub_sections ? ch.sub_sections.filter(s => s.status === 'done').length : 0), 0)} / {toc.reduce((acc, ch) => acc + (ch.sub_sections ? ch.sub_sections.length : 0), 0)} 완료
                             </div>
                         </div>
-                    )}
+                    )} */}
 
                     <Editor id="proposal-content" initialContent={proposal?.content} onChange={handleContentChange} />
                 </main>

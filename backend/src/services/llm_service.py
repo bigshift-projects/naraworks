@@ -30,15 +30,16 @@ class ProjectOverview(BaseModel):
     key_objectives: List[str] = Field(description="List of key objectives or tasks")
     project_summary: str = Field(description="A 10-line summary of the project background and purpose")
 
-class TOCItem(BaseModel):
-    title: str = Field(description="Section title, e.g. '1. Introduction'")
-    description: str = Field(description="Brief guideline or content description for this section")
-    sub_sections: Optional[List['TOCItem']] = Field(default=None, description="Nested subsections")
+class SubsectionItem(BaseModel):
+    title: str = Field(description="Subsection title, e.g. '1. 사업의 목적'")
+    guideline: str = Field(description="Writing guideline for this subsection")
 
-
+class ChapterItem(BaseModel):
+    chapter_title: str = Field(description="Chapter title, e.g. 'I. 제안 개요'")
+    sub_sections: List[SubsectionItem] = Field(description="List of sub-sections")
 
 class TOCStructure(BaseModel):
-    toc: List[TOCItem] = Field(description="The list of top-level TOC items")
+    toc: List[ChapterItem] = Field(description="The list of chapters")
 
 class ClassificationResult(BaseModel):
     is_proposal_guide: bool = Field(description="True if the page contains proposal writing guidelines or proposal TOC")
@@ -151,12 +152,11 @@ def structure_toc_from_pages(text_content: str) -> Dict[str, Any]:
         
         **CRITICAL INSTRUCTIONS:**
         1. **Ignore RFP's own TOC**: If the text contains the RFP's document outline (e.g. "1. Project Overview... 2. Current Status..."), IGNORE IT. Only extract the structure required for the *Proposal Response*.
-        2. **Hierarchy**: transform the flat text into a nested structure (Chapter -> Section -> Subsection).
-           - Top level: I, II, III... or 1, 2, 3... (Big Chapters)
-           - Second level: 1, 2, 3... or 가, 나, 다... (Sections)
-        3. **Descriptions**: If there are specific guidelines, requirements, or evaluation criteria associated with a section, include them in the 'description' field.
+        2. **Hierarchy**: transform the flat text into a nested structure (Chapter -> Sub-sections).
+           - Big Chapters (e.g., I, II, III... or 1, 2, 3...) should be mapped to 'chapter_title'.
+           - Sections under them (e.g., 1, 2, 3... or 가, 나, 다...) should be mapped to 'sub_sections' list with 'title'.
+        3. **Guidelines**: If there are specific requirements or evaluation criteria associated with a section, include them in the 'guideline' field.
         4. **Exhaustiveness**: Extract ALL chapters and sections found in the text. Do not skip any items.
-        5. **Tables**: If the guidelines are presented in a table (e.g., "Evaluation Area" | "Evaluation Item"), treat "Area" as Chapter and "Item" as Section.
         
         {format_instructions}
         

@@ -1,5 +1,8 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks
 import logging
+import json
+import os
+from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from ..services.supabase_client import supabase
@@ -85,6 +88,29 @@ async def parse_rfp(
     toc_data = structure_toc_from_pages(toc_text)
     toc_items = toc_data.get("toc", [])
     logger.info(f"parse_rfp: structure_toc: Completed. Found {len(toc_items)} top-level items.")
+    
+    # 4.1 Save TOC JSON to local file
+    try:
+        project_name = overview_data.get("project_name", "unknown_project")
+        # Sanitize filename
+        safe_project_name = "".join([c if c.isalnum() or c in (" ", "_", "-") else "_" for c in project_name]).strip()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"toc_{safe_project_name}_{timestamp}.json"
+        
+        # Ensure data directory exists (relative to backend root)
+        # Assuming we are in backend/src/routers
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        data_dir = os.path.join(base_dir, "data", "toc_json")
+        os.makedirs(data_dir, exist_ok=True)
+        
+        filepath = os.path.join(data_dir, filename)
+        
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(toc_items, f, ensure_ascii=False, indent=2)
+        
+        logger.info(f"parse_rfp: Saved structured TOC JSON to {filepath}")
+    except Exception as e:
+        logger.error(f"parse_rfp: Failed to save TOC JSON: {e}")
     
     # 5. Create a draft proposal and return info
     # In a real app, we might store the whole RFP text in a separate table or storage.
