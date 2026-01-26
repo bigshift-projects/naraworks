@@ -16,8 +16,22 @@ from pydantic import BaseModel, Field
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# Initialize ChatOpenAI
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+# LLM Model Configuration
+# 각 함수별로 사용할 모델을 여기서 정의합니다.
+MODEL_CONFIG = {
+    "default": "gpt-5.1",
+    "analyze_rfp_overview": "gpt-5.1",   # 사업 개요 작성
+    "classify_toc_page": "gpt-5.1",   # 목차 페이지 분류
+    "structure_toc_from_pages": "gpt-5.1",   # 목차 구조화
+    "generate_section_content": "gpt-5.2",   # 제안서 본문 작성
+}
+
+def get_llm(task_name: str = "default", temperature: float = 0) -> ChatOpenAI:
+    """
+    Returns a ChatOpenAI instance based on the task name configuration.
+    """
+    model_name = MODEL_CONFIG.get(task_name, MODEL_CONFIG["default"])
+    return ChatOpenAI(model=model_name, temperature=temperature)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -73,6 +87,7 @@ def analyze_rfp_overview(text_content: str) -> Dict[str, Any]:
         partial_variables={"format_instructions": parser.get_format_instructions()}
     )
     
+    llm = get_llm("analyze_rfp_overview")
     chain = prompt | llm | parser
     
     try:
@@ -128,6 +143,7 @@ def classify_toc_page(text_content: str) -> bool:
         partial_variables={"format_instructions": parser.get_format_instructions()}
     )
     
+    llm = get_llm("classify_toc_page")
     chain = prompt | llm | parser
     
     try:
@@ -168,6 +184,7 @@ def structure_toc_from_pages(text_content: str) -> Dict[str, Any]:
     )
     
     # Use GPT-4o for complex structuring
+    llm = get_llm("structure_toc_from_pages")
     chain = prompt | llm | parser
     
     try:
@@ -181,84 +198,47 @@ def structure_toc_from_pages(text_content: str) -> Dict[str, Any]:
         return {"toc": []}
 
 
-def generate_toc(rfp_text: str) -> dict:
-    """
-    Generates a Table of Contents (TOC) based on RFP text.
-    Returns a dict with 'toc', which is a list of sections.
-    """
-    
-    system_prompt = """
-    You are an expert proposal writer. 
-    Analyze the provided Request for Proposal (RFP) text and create a structured Table of Contents (TOC).
-    
-    Output Format:
-    Return a JSON object with a "toc" key.
-    "toc" should be a list of objects, each having:
-    - "title": The section title (e.g., "1. Project Overview")
-    - "description": A brief description of what should go in this section.
-    
-    Example:
-    {
-      "toc": [
-        {"title": "1. 제안 개요", "description": "사업 배경 및 목적, 추진 전략"},
-        {"title": "2. 제안 업체 현황", "description": "일반 현황, 조직 및 인원, 주요 사업 실적"}
-      ]
-    }
-    """
-
-    user_message = f"""
-    [RFP content]
-    {rfp_text[:15000]}
-    
-    Based on the RFP above, suggest a comprehensive Table of Contents for the proposal.
-    """
-
-    try:
-        logger.info("llm_service: generate_toc: Sending request to LLM...")
-        parser = JsonOutputParser()
-        prompt = PromptTemplate(
-            template="{system_prompt}\n\n{user_message}",
-            input_variables=["system_prompt", "user_message"]
-        )
-        chain = prompt | llm | parser
-        result = chain.invoke({"system_prompt": system_prompt, "user_message": user_message})
-        logger.info("llm_service: generate_toc: LLM response received.")
-        return result
-    except Exception as e:
-        logger.error(f"llm_service: generate_toc: Error: {e}")
-        return {
-            "toc": [
-                {"title": "Error Generating TOC", "description": str(e)}
-            ]
-        }
-
 def generate_section_content(section_title: str, rfp_context: str = "") -> str:
     """
     Generates HTML content for a specific proposal section.
     """
     
     system_prompt = """
-    You are an expert proposal writer.
-    Write the content for a specific section of a proposal based on the RFP.
+    너는 공공기관 및 교육기관 입찰용 제안서 작성 전문가야. 
+    나라장터 B2G 정부 입찰공고에서 AI 및 소프트웨어 용역에 참가해 낙찰받으려고 제안서를 만들거야. 
+    참여하려는 사업 개요는 아래와 같아.
+
+    [사업 개요]
+    {rfp_context}
+
+    작성해야하는 제안서 목차는 아래와 같아. 중분류 목차를 차례로 하나씩 내용을 작성할 거야.
+
+    [제안서 목차]
+    {toc}
+
+    제안서 목차에서 "{section_title}"의 내용에 대해 구체적인 내용을 작성해줘.
+    작성 가이드라인과 출력형식을 지켜서 작성해줘.
+
+    [작성 가이드라인]
+    - (제안서 목차의 지침)
+    - 글자수 1,500자 이내로 작성해줘.
+    - 표나 차트를 넣어도 좋아.
+    - 구조화: 가독성을 위해 소제목, 불렛 포인트, 번호 매기기를 적극적으로 활용해줘.
+    - RFP 준수: 반드시 제안요청서에 명시된 요구사항과 핵심 키워드를 반영해야 해.
+    - 첨부한 제안요청서 pdf파일을 참고해.
+    - 필요시, 첨부한 회사소개서 pdf파일을 참고해.
+    - 필요시, 첨부한 제안서 pdf 파일을 참고해. 단, 프로젝트 세부 내용이 다르니 주의해.
+    - 전문성: 기술적 용어를 정확하게 사용하고, 신뢰감을 주는 비즈니스 문체(~함, ~임 등 명조체 기반의 개조식 또는 정중한 평어체)를 사용해줘.
     
-    Output Format:
-    Return valid HTML for the section content. 
-    Use appropriate tags (h2, h3, p, ul, li).
-    Do not include the main h1 title or <html>/<body> tags.
-    Target the content specifically for the given section title.
-    """
-    
-    user_message = f"""
-    [Section Title]
-    {section_title}
-    
-    [RFP Context]
-    {rfp_context[:5000]}
-    
-    Write the detailed content for this section.
+
+    [출력 형식]
+    - 해당 섹션의 내용을 유효한 HTML 태그로 작성해줘.
+    - <h2>, <h3>, <p>, <ul>, <li> 등의 태그를 사용하되, 문서 전체 제목인 <h1>이나 <html>, <body> 태그는 포함하지 마.
+    - 바로 웹페이지나 제안서 툴에 삽입할 수 있는 순수 섹션 콘텐츠만 출력해줘.
     """
     
     try:
+        llm = get_llm("generate_section_content")
         response = llm.invoke(f"{system_prompt}\n\n{user_message}")
         return response.content
     except Exception as e:
