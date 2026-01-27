@@ -115,8 +115,15 @@ async def parse_rfp(
         try:
             logger.info(f"parse_rfp: Helper - Updating proposal {proposal_id} in DB...")
             
+            # Extract project name for title
+            new_title = overview_data.get("project_name")
+            if not new_title or new_title == "Error extracting name":
+                new_title = "Untitled Proposal"
+            
+            logger.info(f"parse_rfp: Updating proposal title to: {new_title}")
+
             data = {
-                "title": overview_data.get("project_name", "Untitled Proposal"),
+                "title": new_title,
                 "toc": toc_items,
                 "overview": overview_data,
                 "status": "toc_generated",

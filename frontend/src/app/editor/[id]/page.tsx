@@ -189,12 +189,19 @@ export default function EditorPage() {
                 setToc(newToc);
 
                 // Update Overview Data & Status
+                let newTitle = title;
                 if (res.data.overview) {
                     setOverviewData(res.data.overview);
                     setStepStatus(prev => ({ ...prev, overviewExtracted: true }));
+
+                    // Update Title from Project Name
+                    if (res.data.overview.project_name) {
+                        newTitle = res.data.overview.project_name;
+                        setTitle(newTitle);
+                    }
                 }
 
-                mutation.mutate({ id, title, content, toc: newToc, overview: res.data.overview, status: 'toc_confirmed' });
+                mutation.mutate({ id, title: newTitle, content, toc: newToc, overview: res.data.overview, status: 'toc_confirmed' });
             } else {
                 alert('목차 생성에 실패했습니다. PDF에 텍스트가 포함되어 있는지 확인해주세요.');
                 setStepStatus(prev => ({ ...prev, pdfUploaded: false })); // Reset on failure

@@ -13,7 +13,7 @@ export const generatePdf = async (elementId: string, filename: string) => {
 
         // Capture as JPEG with 0.5 quality for better compression
         const dataUrl = await toJpeg(element, {
-            quality: 0.5,
+            quality: 0.8,
             backgroundColor: '#ffffff',
             width: 800,
             style: {
