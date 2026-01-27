@@ -6,7 +6,7 @@ import axios from '@/lib/axios';
 import { useState, useEffect, useCallback } from 'react';
 import Editor from '@/components/Editor';
 import StepProgress from '@/components/StepProgress';
-import { ChevronLeft, Loader2, Save, Download, Check, FileText, FileType, Pencil, Trash, X } from 'lucide-react';
+import { ChevronLeft, Loader2, Save, Download, Check, FileText, FileType, Pencil, Trash, X, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 
 interface TOCSubSection {
@@ -386,7 +386,7 @@ export default function EditorPage() {
                 </div>
             </header>
 
-            <div className="flex flex-1 max-w-7xl w-full">
+            <div className="flex flex-1 w-full">
                 {/* Sidebar (Split Layout) */}
                 <aside className="w-80 left-0 border-r border-gray-200 bg-white flex flex-col h-[calc(100vh-72px)] sticky top-[72px]">
 
@@ -473,7 +473,21 @@ export default function EditorPage() {
                                                                 {section.title}
                                                             </span>
                                                             {section.status === 'generating' && <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />}
-                                                            {section.status === 'done' && <Check className="w-4 h-4 text-green-500 shrink-0" />}
+                                                            {section.status === 'done' && (
+                                                                <div className="flex items-center gap-1">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleGenerateSection(cIdx, sIdx);
+                                                                        }}
+                                                                        className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-blue-600 transition-colors"
+                                                                        title="다시 생성"
+                                                                    >
+                                                                        <RotateCcw className="w-3 h-3" />
+                                                                    </button>
+                                                                    <Check className="w-4 h-4 text-green-500 shrink-0" />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         {section.guideline && (
                                                             <p className="text-xs text-gray-400 mb-2 line-clamp-2 leading-relaxed whitespace-pre-line">{section.guideline}</p>
@@ -522,10 +536,11 @@ export default function EditorPage() {
 
                 </aside>
 
-                <main className="flex-1 p-8 pt-4 w-full mx-auto relative">
-
+                <main className="flex-1 p-8 pt-4 w-full relative">
                     <Editor id="proposal-content" initialContent={proposal?.content} onChange={handleContentChange} />
                 </main>
+
+                <div className="w-80" />
             </div>
         </div>
     );
