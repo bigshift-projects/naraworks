@@ -6,7 +6,7 @@ import axios from '@/lib/axios';
 import { useState, useEffect, useCallback } from 'react';
 import Editor from '@/components/Editor';
 import StepProgress from '@/components/StepProgress';
-import { ChevronLeft, Loader2, Save, Download, Check, FileText, Pencil, Trash, X } from 'lucide-react';
+import { ChevronLeft, Loader2, Save, Download, Check, FileText, FileType, Pencil, Trash, X } from 'lucide-react';
 import Link from 'next/link';
 
 interface TOCSubSection {
@@ -386,9 +386,9 @@ export default function EditorPage() {
                 </div>
             </header>
 
-            <div className="flex flex-1 max-w-7xl mx-auto w-full">
+            <div className="flex flex-1 max-w-7xl w-full">
                 {/* Sidebar (Split Layout) */}
-                <aside className="w-80 border-r border-gray-200 bg-white flex flex-col h-[calc(100vh-80px)] sticky top-[80px]">
+                <aside className="w-80 left-0 border-r border-gray-200 bg-white flex flex-col h-[calc(100vh-72px)] sticky top-[72px]">
 
                     {/* Top Hand: Step Progress & Overview (Fixed/Flexible) */}
                     <div className="border-b border-gray-200 bg-gray-50/50">
@@ -400,8 +400,11 @@ export default function EditorPage() {
                     </div>
 
                     {/* Bottom Half: TOC (Flexible height) */}
-                    <div className="flex-1 overflow-y-auto p-6">
-                        <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 tracking-wider">목차 (Table of Contents)</h3>
+                    <div className="flex-1 overflow-y-auto p-4">
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-8 tracking-wider">
+                            <FileType className="w-4 h-4 text-blue-600" />
+                            목차
+                        </h3>
                         <div className="space-y-4">
                             {toc.map((chapter, cIdx) => (
                                 <div key={cIdx} className="mb-6">
@@ -519,7 +522,7 @@ export default function EditorPage() {
 
                 </aside>
 
-                <main className="flex-1 p-8 pt-4 w-full relative">
+                <main className="flex-1 p-8 pt-4 w-full mx-auto relative">
 
                     <Editor id="proposal-content" initialContent={proposal?.content} onChange={handleContentChange} />
                 </main>

@@ -243,26 +243,58 @@ def generate_section_content(section_title: str, rfp_context: str = "", toc: str
     except Exception as e:
         logger.warning(f"llm_service: generate_section_content: Failed to format rfp_context: {e}")
 
+    # Parse and format TOC (JSON string) into narrative text, and find specific guideline
+    formatted_toc = toc
+    target_guideline = ""
+    try:
+        if toc.strip().startswith("["):
+            toc_data = json.loads(toc)
+            if isinstance(toc_data, list):
+                toc_lines = []
+                for chapter in toc_data:
+                    chapter_title = chapter.get("chapter_title", "")
+                    if chapter_title:
+                        toc_lines.append(chapter_title)
+                    
+                    sub_sections = chapter.get("sub_sections", [])
+                    for sub in sub_sections:
+                        sub_title = sub.get("title", "")
+                        if sub_title:
+                            toc_lines.append(sub_title)
+                        
+                        # Check if this is the target section to extract guideline
+                        if sub_title == section_title:
+                            target_guideline = sub.get("guideline", "")
+                
+                if toc_lines:
+                    formatted_toc = "\n".join(toc_lines)
+    except Exception as e:
+        logger.warning(f"llm_service: generate_section_content: Failed to format TOC or find guideline: {e}")
+
+
     prompt_text = f"""
     당신은 나라장터(G2B) 기반의 공공/교육기관 AI 및 소프트웨어 용역 입찰에서 높은 기술 점수를 받아 낙찰되는걸 목표로 제안서를 작성하는 전문가입니다. 
     단순 요약이 아니라, 발주처의 문제를 해결하고 타사 대비 차별성을 강조하는 제안 내용을 생성해야 합니다.
-    목차의 중분류 섹션(sub_section)을 차례로 작성하고 있습니다.
+    목차의 sub_section을 차례로 작성하고 있습니다.
     작성 가이드라인과 출력형식을 지켜서, 목차에서 "{section_title}"에 대해 구체적인 내용을 작성하세요. 
 
     1. 입력 데이터 (Context)
     - [사업 개요]: {formatted_rfp_context}
-    - [제안사(우리 회사) 강점 및 경험]: {company_context}
-    - [전체 목차 구조]: {toc}
+    - [전체 목차 구조]: {formatted_toc}
 
     2. 작성 가이드라인
-    - 평가 지표 기반: RFP상의 평가 배점 기준을 분석하여 점수가 부여되는 핵심 키워드를 반영하세요.
+    - 핵심 작성 지침: {target_guideline if target_guideline else "제안 요청서(RFP)의 요구사항을 충실히 반영하여 작성하세요."}
     - 구조화: 가독성을 위해 소제목, 불렛 포인트, 번호 매기기를 적극적으로 활용하세요.    
     - 전문성: 기술적 용어를 정확하게 사용하고, 신뢰감을 주는 비즈니스 문체(명조체 기반의 개조식 또는 '~합니다'와 같은 정중한 문체)를 사용하세요.
     - 시각화 유도: 데이터나 프로세스를 설명할 때는 <table> 또는 <ul>/<li> 태그를 사용하여 구조화하세요. 
     - 현실적 구체성: "최선을 다하겠다"는 추상적 표현 대신 "A 기술을 활용해 응답 속도를 0.5초 이내로 단축"과 같이 수치와 기술명을 구체적으로 명시하세요.
+    - 평가 지표 기반: RFP상의 평가 배점 기준을 분석하여 점수가 부여되는 핵심 키워드를 반영하세요.
     - 분량: 공백 포함 약 1,300자 내외로 작성하세요.
 
-    3. 출력 형식
+    3. 추가 입력 데이터
+    - [제안사(우리 회사) 강점 및 경험]: {company_context}
+
+    4. 출력 형식
     - 결과물은 반드시 유효한 HTML 태그 형태로 출력하세요.
     - 사용 가능 태그: <h2>, <h3>, <h4>, <p>, <ul>, <li>, <table>, <thead>, <tbody>, <tr>, <th>, <td>, <strong>
     - <html>, <body>, <h1> 태그 및 마크다운 코드 블록(```html)은 포함하지 마세요.
