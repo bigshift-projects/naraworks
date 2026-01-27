@@ -540,7 +540,7 @@ export default function EditorPage() {
                     <Editor id="proposal-content" initialContent={proposal?.content} onChange={handleContentChange} />
                 </main>
 
-                <div className="w-80" />
+                <div className="max-w-[320px]" />
             </div>
         </div>
     );

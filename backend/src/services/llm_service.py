@@ -183,7 +183,6 @@ def structure_toc_from_pages(text_content: str) -> Dict[str, Any]:
         partial_variables={"format_instructions": parser.get_format_instructions()}
     )
     
-    # Use GPT-4o for complex structuring
     llm = get_llm("structure_toc_from_pages")
     chain = prompt | llm | parser
     
