@@ -230,7 +230,7 @@ export default function EditorPage() {
 
             // Append content with header 
             // Optional: You might want to format this better or let the backend handle everything
-            const newContentSection = `\n\n<h3>${section.title}</h3>\n${generatedContent}`;
+            const newContentSection = generatedContent;
             const newContent = content + newContentSection;
 
             setContent(newContent);

@@ -151,10 +151,31 @@ class SectionGenerationRequest(BaseModel):
     description="Generate draft content for a specific section of the proposal using LLM."
 )
 async def generate_section(id: str, req: SectionGenerationRequest):
-    # In a real app, we would fetch the proposal to get the RFP context (if linked) 
-    # or accept context in the request body.
-    # For now, we will perform a simple generation. 
-    # TODO: Fetch RFP text associated with this proposal if possible.
+    # Fetch proposal to get the RFP context and TOC
+    rfp_context_str = ""
+    toc_str = ""
     
-    content = generate_section_content(req.section_title)
+    if supabase:
+        try:
+            response = supabase.table("naraworks_proposals").select("overview, toc").eq("id", id).execute()
+            if response.data and len(response.data) > 0:
+                proposal_data = response.data[0]
+                overview = proposal_data.get("overview", {})
+                toc = proposal_data.get("toc", [])
+                
+                # Format overview and TOC for prompt
+                rfp_context_str = json.dumps(overview, ensure_ascii=False, indent=2)
+                toc_str = json.dumps(toc, ensure_ascii=False, indent=2)
+                
+                logger.info(f"generate_section: Fetched context for proposal {id}")
+            else:
+                logger.warning(f"generate_section: Proposal {id} not found or has no data. Generating without context.")
+        except Exception as e:
+            logger.error(f"generate_section: Error fetching proposal data: {e}")
+    
+    content = generate_section_content(
+        section_title=req.section_title, 
+        rfp_context=rfp_context_str,
+        toc=toc_str
+    )
     return {"content": content}

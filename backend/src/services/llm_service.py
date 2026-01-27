@@ -23,7 +23,7 @@ MODEL_CONFIG = {
     "analyze_rfp_overview": "gpt-5.1",   # 사업 개요 작성
     "classify_toc_page": "gpt-5.1",   # 목차 페이지 분류
     "structure_toc_from_pages": "gpt-5.1",   # 목차 구조화
-    "generate_section_content": "gpt-5.2",   # 제안서 본문 작성
+    "generate_section_content": "gpt-5.2",   # 제안서 본문 작성 (플래그십 추론 모델)
 }
 
 def get_llm(task_name: str = "default", temperature: float = 0) -> ChatOpenAI:
@@ -198,50 +198,96 @@ def structure_toc_from_pages(text_content: str) -> Dict[str, Any]:
         return {"toc": []}
 
 
-def generate_section_content(section_title: str, rfp_context: str = "") -> str:
+def generate_section_content(section_title: str, rfp_context: str = "", toc: str = "") -> str:
     """
     Generates HTML content for a specific proposal section.
     """
     
-    system_prompt = """
-    너는 공공기관 및 교육기관 입찰용 제안서 작성 전문가야. 
-    나라장터 B2G 정부 입찰공고에서 AI 및 소프트웨어 용역에 참가해 낙찰받으려고 제안서를 만들거야. 
-    참여하려는 사업 개요는 아래와 같아.
-
-    [사업 개요]
-    {rfp_context}
-
-    작성해야하는 제안서 목차는 아래와 같아. 중분류 목차를 차례로 하나씩 내용을 작성할 거야.
-
-    [제안서 목차]
-    {toc}
-
-    제안서 목차에서 "{section_title}"의 내용에 대해 구체적인 내용을 작성해줘.
-    작성 가이드라인과 출력형식을 지켜서 작성해줘.
-
-    [작성 가이드라인]
-    - (제안서 목차의 지침)
-    - 글자수 1,500자 이내로 작성해줘.
-    - 표나 차트를 넣어도 좋아.
-    - 구조화: 가독성을 위해 소제목, 불렛 포인트, 번호 매기기를 적극적으로 활용해줘.
-    - RFP 준수: 반드시 제안요청서에 명시된 요구사항과 핵심 키워드를 반영해야 해.
-    - 첨부한 제안요청서 pdf파일을 참고해.
-    - 필요시, 첨부한 회사소개서 pdf파일을 참고해.
-    - 필요시, 첨부한 제안서 pdf 파일을 참고해. 단, 프로젝트 세부 내용이 다르니 주의해.
-    - 전문성: 기술적 용어를 정확하게 사용하고, 신뢰감을 주는 비즈니스 문체(~함, ~임 등 명조체 기반의 개조식 또는 정중한 평어체)를 사용해줘.
+    # Load company context from bigshift_info.md
+    company_info_path = Path(__file__).resolve().parent.parent.parent / "data" / "빅시프트" / "bigshift_info.md"
+    company_context = ""
     
+    try:
+        with open(company_info_path, 'r', encoding='utf-8') as f:
+            company_context = f.read()
+        logger.info(f"llm_service: generate_section_content: Loaded company context from {company_info_path}")
+    except Exception as e:
+        logger.warning(f"llm_service: generate_section_content: Could not load company context: {e}")
+        company_context = ""
 
-    [출력 형식]
-    - 해당 섹션의 내용을 유효한 HTML 태그로 작성해줘.
-    - <h2>, <h3>, <p>, <ul>, <li> 등의 태그를 사용하되, 문서 전체 제목인 <h1>이나 <html>, <body> 태그는 포함하지 마.
-    - 바로 웹페이지나 제안서 툴에 삽입할 수 있는 순수 섹션 콘텐츠만 출력해줘.
+    # Parse and format rfp_context (JSON string) into narrative text
+    formatted_rfp_context = rfp_context
+    try:
+        if rfp_context.strip().startswith("{"):
+            rfp_data = json.loads(rfp_context)
+            if isinstance(rfp_data, dict):
+                summary = rfp_data.get("project_summary", "")
+                budget = rfp_data.get("budget", "")
+                period = rfp_data.get("period", "")
+                
+                parts = []
+                if summary:
+                    parts.append(summary)
+                
+                info_sentence = []
+                if budget:
+                    info_sentence.append(f"예산은 {budget}")
+                if period:
+                    info_sentence.append(f"기간은 {period}")
+                
+                if info_sentence:
+                    parts.append(f"본 사업의 {'이며, '.join(info_sentence)}입니다.")
+                
+                if parts:
+                    formatted_rfp_context = " ".join(parts)
+    except Exception as e:
+        logger.warning(f"llm_service: generate_section_content: Failed to format rfp_context: {e}")
+
+    prompt_text = f"""
+    당신은 나라장터(G2B) 기반의 공공/교육기관 AI 및 소프트웨어 용역 입찰에서 높은 기술 점수를 받아 낙찰되는걸 목표로 제안서를 작성하는 전문가입니다. 
+    단순 요약이 아니라, 발주처의 문제를 해결하고 타사 대비 차별성을 강조하는 제안 내용을 생성해야 합니다.
+    목차의 중분류 섹션(sub_section)을 차례로 작성하고 있습니다.
+    작성 가이드라인과 출력형식을 지켜서, 목차에서 "{section_title}"에 대해 구체적인 내용을 작성하세요. 
+
+    1. 입력 데이터 (Context)
+    - [사업 개요]: {formatted_rfp_context}
+    - [제안사(우리 회사) 강점 및 경험]: {company_context}
+    - [전체 목차 구조]: {toc}
+
+    2. 작성 가이드라인
+    - 평가 지표 기반: RFP상의 평가 배점 기준을 분석하여 점수가 부여되는 핵심 키워드를 반영하세요.
+    - 구조화: 가독성을 위해 소제목, 불렛 포인트, 번호 매기기를 적극적으로 활용하세요.    
+    - 전문성: 기술적 용어를 정확하게 사용하고, 신뢰감을 주는 비즈니스 문체(명조체 기반의 개조식 또는 '~합니다'와 같은 정중한 문체)를 사용하세요.
+    - 시각화 유도: 데이터나 프로세스를 설명할 때는 <table> 또는 <ul>/<li> 태그를 사용하여 구조화하세요. 
+    - 현실적 구체성: "최선을 다하겠다"는 추상적 표현 대신 "A 기술을 활용해 응답 속도를 0.5초 이내로 단축"과 같이 수치와 기술명을 구체적으로 명시하세요.
+    - 분량: 공백 포함 약 1,300자 내외로 작성하세요.
+
+    3. 출력 형식
+    - 결과물은 반드시 유효한 HTML 태그 형태로 출력하세요.
+    - 사용 가능 태그: <h2>, <h3>, <h4>, <p>, <ul>, <li>, <table>, <thead>, <tbody>, <tr>, <th>, <td>, <strong>
+    - <html>, <body>, <h1> 태그 및 마크다운 코드 블록(```html)은 포함하지 마세요.
+    - 태그 외의 설명 문구(예: "네, 알겠습니다")는 생략하고 HTML 본문만 출력하세요.
     """
+    logger.info(f"prompt_text: {prompt_text}")
     
     try:
         llm = get_llm("generate_section_content")
-        response = llm.invoke(f"{system_prompt}\n\n{user_message}")
-        return response.content
+        response = llm.invoke(prompt_text)
+        content = response.content.strip()
+        
+        # Clean up markdown code blocks (e.g., ```html ... ``` or just ``` ... ```)
+        import re
+        code_block_match = re.search(r"```(?:html)?\n?(.*?)\n?```", content, re.DOTALL)
+        if code_block_match:
+            content = code_block_match.group(1)
+        else:
+            # If no match from re.search, try stripping markers manually just in case
+            if content.startswith("```"):
+                content = re.sub(r"^```(?:html)?\n?", "", content)
+                content = re.sub(r"\n?```$", "", content)
+            
+        return content.strip()
     except Exception as e:
-        print(f"Error generating section content: {e}")
+        logger.error(f"Error generating section content: {e}")
         return f"<p>Error generating content: {str(e)}</p>"
 
