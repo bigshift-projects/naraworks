@@ -9,12 +9,16 @@ import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
 import FontFamily from '@tiptap/extension-font-family';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
 import { useEffect, useState } from 'react';
 import {
     Bold, Italic, Underline as UnderlineIcon,
     AlignLeft, AlignCenter, AlignRight, AlignJustify,
     Type, Palette, Highlighter, ChevronDown,
-    List, ListOrdered, Heading1, Heading2, Heading3
+    List, ListOrdered, Heading1, Heading2, Heading3, ArrowUpDown
 } from 'lucide-react';
 
 // Custom Font Size Extension
@@ -69,8 +73,93 @@ declare module '@tiptap/core' {
             setFontSize: (size: string) => ReturnType;
             unsetFontSize: () => ReturnType;
         };
+        lineHeight: {
+            setLineHeight: (lineHeight: string) => ReturnType;
+            unsetLineHeight: () => ReturnType;
+        };
+        paragraphSpacing: {
+            setMarginBottom: (size: string) => ReturnType;
+            unsetMarginBottom: () => ReturnType;
+        };
     }
 }
+
+const LineHeight = Extension.create({
+    name: 'lineHeight',
+    addOptions() {
+        return {
+            types: ['heading', 'paragraph'],
+            defaultLineHeight: '1.5',
+        };
+    },
+    addGlobalAttributes() {
+        return [
+            {
+                types: this.options.types,
+                attributes: {
+                    lineHeight: {
+                        default: this.options.defaultLineHeight,
+                        parseHTML: element => element.style.lineHeight || this.options.defaultLineHeight,
+                        renderHTML: attributes => {
+                            if (!attributes.lineHeight) return {};
+                            return { style: `line-height: ${attributes.lineHeight}` };
+                        },
+                    },
+                },
+            },
+        ];
+    },
+    addCommands() {
+        return {
+            setLineHeight: lineHeight => ({ commands }) => {
+                return commands.updateAttributes('paragraph', { lineHeight })
+                    || commands.updateAttributes('heading', { lineHeight });
+            },
+            unsetLineHeight: () => ({ commands }) => {
+                return commands.resetAttributes('paragraph', 'lineHeight')
+                    || commands.resetAttributes('heading', 'lineHeight');
+            },
+        };
+    },
+});
+
+const ParagraphSpacing = Extension.create({
+    name: 'paragraphSpacing',
+    addOptions() {
+        return {
+            types: ['heading', 'paragraph'],
+        };
+    },
+    addGlobalAttributes() {
+        return [
+            {
+                types: this.options.types,
+                attributes: {
+                    marginBottom: {
+                        default: null,
+                        parseHTML: element => element.style.marginBottom || null,
+                        renderHTML: attributes => {
+                            if (!attributes.marginBottom) return {};
+                            return { style: `margin-bottom: ${attributes.marginBottom}` };
+                        },
+                    },
+                },
+            },
+        ];
+    },
+    addCommands() {
+        return {
+            setMarginBottom: size => ({ commands }) => {
+                return commands.updateAttributes('paragraph', { marginBottom: size })
+                    || commands.updateAttributes('heading', { marginBottom: size });
+            },
+            unsetMarginBottom: () => ({ commands }) => {
+                return commands.updateAttributes('paragraph', { marginBottom: null })
+                    || commands.updateAttributes('heading', { marginBottom: null });
+            },
+        };
+    },
+});
 
 interface EditorProps {
     id?: string;
@@ -78,18 +167,25 @@ interface EditorProps {
     onChange: (content: string) => void;
 }
 
-const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px', '48px'];
+const FONT_SIZES = ['8pt', '9pt', '10pt', '11pt', '12pt', '14pt', '18pt', '24pt', '30pt', '36pt', '48pt', '60pt', '72pt', '96pt'];
 const FONT_FAMILIES = [
     { name: 'Default', value: 'Inter, sans-serif' },
     { name: 'Serif', value: 'serif' },
     { name: 'Monospace', value: 'monospace' },
     { name: 'Pretendard', value: 'Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif' },
 ];
+const LINE_HEIGHTS = [
+    { name: '1.0(한 줄 간격)', value: '1.0' },
+    { name: '1.15', value: '1.15' },
+    { name: '1.5', value: '1.5' },
+    { name: '2.0', value: '2.0' },
+];
 
 const Editor = ({ id, initialContent, onChange }: EditorProps) => {
     const [_, setUpdate] = useState(0);
     const [showFontSizes, setShowFontSizes] = useState(false);
     const [showFontFamilies, setShowFontFamilies] = useState(false);
+    const [showLineHeights, setShowLineHeights] = useState(false);
 
     const editor = useEditor({
         extensions: [
@@ -106,6 +202,14 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
             Highlight.configure({ multicolor: true }),
             FontFamily,
             FontSize,
+            LineHeight.configure({ types: ['heading', 'paragraph'], defaultLineHeight: '1.15' }),
+            ParagraphSpacing,
+            Table.configure({
+                resizable: true,
+            }),
+            TableRow,
+            TableHeader,
+            TableCell,
         ],
         content: initialContent,
         immediatelyRender: false,
@@ -120,7 +224,8 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
         },
         editorProps: {
             attributes: {
-                class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[500px] max-w-none',
+                class: 'prose max-w-none mx-auto focus:outline-none min-h-[500px] text-[11pt] leading-[1.15] text-gray-900',
+                style: 'font-size: 11pt;',
             },
         },
     });
@@ -250,7 +355,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                         onClick={() => setShowFontSizes(!showFontSizes)}
                         className="flex items-center gap-1 p-2 h-9 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded"
                     >
-                        {editor.getAttributes('textStyle').fontSize || '16px'} <ChevronDown size={14} />
+                        {editor.getAttributes('textStyle').fontSize || '11pt'} <ChevronDown size={14} />
                     </button>
                     {showFontSizes && (
                         <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-[60] py-1 min-w-[60px]">
@@ -347,6 +452,58 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                     <AlignJustify size={18} />
                 </ToolbarButton>
 
+                {/* Line Height Dropdown */}
+                <div className="relative">
+                    <button
+                        onClick={() => setShowLineHeights(!showLineHeights)}
+                        className="p-2 rounded transition-colors hover:bg-gray-200 text-gray-600"
+                        title="Line & Paragraph Spacing"
+                    >
+                        <ArrowUpDown size={18} />
+                    </button>
+                    {showLineHeights && (
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-[60] py-1 min-w-[180px]">
+                            {LINE_HEIGHTS.map((lh) => (
+                                <button
+                                    key={lh.value}
+                                    onClick={() => {
+                                        editor.chain().focus().setLineHeight(lh.value).run();
+                                        setShowLineHeights(false);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 flex items-center justify-between"
+                                >
+                                    <span>{lh.name}</span>
+                                    {editor.getAttributes('paragraph').lineHeight === lh.value && (
+                                        <span className="text-blue-600">✓</span>
+                                    )}
+                                </button>
+                            ))}
+                            <div className="h-px bg-gray-100 my-1" />
+                            <button
+                                onClick={() => {
+                                    const currentMb = editor.getAttributes('paragraph').marginBottom;
+                                    if (currentMb) {
+                                        editor.chain().focus().unsetMarginBottom().run();
+                                    } else {
+                                        editor.chain().focus().setMarginBottom('12pt').run();
+                                    }
+                                    setShowLineHeights(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 flex items-center justify-between"
+                            >
+                                <span>
+                                    {editor.getAttributes('paragraph').marginBottom
+                                        ? 'Remove space after paragraph'
+                                        : 'Add space after paragraph'}
+                                </span>
+                                {editor.getAttributes('paragraph').marginBottom && (
+                                    <span className="text-blue-600">✓</span>
+                                )}
+                            </button>
+                        </div>
+                    )}
+                </div>
+
                 <div className="w-px h-6 bg-gray-200 mx-1 self-center" />
 
                 <ToolbarButton
@@ -420,6 +577,46 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                     color: #adb5bd;
                     pointer-events: none;
                     height: 0;
+                }
+
+                /* Table Styles */
+                :global(.ProseMirror table) {
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                    width: 100%;
+                    margin: 0;
+                    overflow: hidden;
+                }
+                :global(.ProseMirror td),
+                :global(.ProseMirror th) {
+                    min-width: 1em;
+                    border: 1px solid #ced4da;
+                    padding: 3px 5px;
+                    vertical-align: top;
+                    box-sizing: border-box;
+                    position: relative;
+                }
+                :global(.ProseMirror th) {
+                    font-weight: bold;
+                    text-align: left;
+                    background-color: #f1f3f5;
+                }
+                :global(.ProseMirror .selectedCell:after) {
+                    z-index: 2;
+                    position: absolute;
+                    content: "";
+                    left: 0; right: 0; top: 0; bottom: 0;
+                    background: rgba(200, 200, 255, 0.4);
+                    pointer-events: none;
+                }
+                :global(.ProseMirror .column-resize-handle) {
+                    position: absolute;
+                    right: -2px;
+                    top: 0;
+                    bottom: 0;
+                    width: 4px;
+                    background-color: #adf;
+                    pointer-events: none;
                 }
             `}</style>
         </div>

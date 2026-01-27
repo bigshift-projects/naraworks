@@ -68,7 +68,7 @@ export default function StepProgress({ step, status, overviewData }: StepProgres
                         {/* Project Name */}
                         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
                             <span className="text-md text-blue-600 font-bold uppercase tracking-wider block mb-1">사업명</span>
-                            <span className="text-sm font-bold text-gray-900 leading-tight block">{overviewData.project_name || '-'}</span>
+                            <span className="text-sm font-bold text-gray-900">{overviewData.project_name || '-'}</span>
                         </div>
 
                         {/* Budget & Period */}
@@ -87,7 +87,7 @@ export default function StepProgress({ step, status, overviewData }: StepProgres
                         {overviewData.project_summary && (
                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                                 <span className="text-md text-gray-500 font-bold uppercase tracking-wider block mb-1">사업 개요</span>
-                                <span className="text-gray-900 leading-tight block">{overviewData.project_summary}</span>
+                                <span className="text-gray-900">{overviewData.project_summary}</span>
                             </div>
                         )}
 
