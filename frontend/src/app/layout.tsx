@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Naraworks - B2G Proposal SaaS",
-  description: "AI-Powered B2G Proposal Editor",
+  title: "나라웍스 - 입찰 제안서 작성 AI",
+  description: "입찰 제안서 작성 AI",
   robots: {
     index: false,
     follow: false,

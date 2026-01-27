@@ -169,10 +169,12 @@ interface EditorProps {
 
 const FONT_SIZES = ['8pt', '9pt', '10pt', '11pt', '12pt', '14pt', '18pt', '24pt', '30pt', '36pt', '48pt', '60pt', '72pt', '96pt'];
 const FONT_FAMILIES = [
-    { name: 'Default', value: 'Inter, sans-serif' },
+    { name: '기본(프리텐다드)', value: 'Pretendard, sans-serif' },
+    { name: '노토산스 KR', value: '"Noto Sans KR", sans-serif' },
+    { name: '나눔바른고딕', value: '"Nanum Barun Gothic", sans-serif' },
+    { name: 'Inter', value: 'Inter, sans-serif' },
     { name: 'Serif', value: 'serif' },
     { name: 'Monospace', value: 'monospace' },
-    { name: 'Pretendard', value: 'Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif' },
 ];
 const LINE_HEIGHTS = [
     { name: '1.0(한 줄 간격)', value: '1.0' },
@@ -225,7 +227,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
         editorProps: {
             attributes: {
                 class: 'prose max-w-none mx-auto focus:outline-none min-h-[500px] text-[11pt] leading-[1.15] text-gray-900',
-                style: 'font-size: 11pt;',
+                style: 'font-size: 11pt; font-family: Pretendard, sans-serif;',
             },
         },
     });
@@ -328,7 +330,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                         onClick={() => setShowFontFamilies(!showFontFamilies)}
                         className="flex items-center gap-1 p-2 h-9 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded"
                     >
-                        Font <ChevronDown size={14} />
+                        {FONT_FAMILIES.find(f => f.value === editor.getAttributes('textStyle').fontFamily)?.name || '기본(프리텐다드)'} <ChevronDown size={14} />
                     </button>
                     {showFontFamilies && (
                         <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-[60] py-1 min-w-[120px]">
