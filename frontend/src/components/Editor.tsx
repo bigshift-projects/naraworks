@@ -226,7 +226,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
         },
         editorProps: {
             attributes: {
-                class: 'prose max-w-none mx-auto focus:outline-none min-h-[500px] text-[11pt] leading-[1.15] text-gray-900',
+                class: 'prose max-w-none mx-auto focus:outline-none min-h-[500px] text-[11pt] leading-[1.5] text-gray-900',
                 style: 'font-size: 11pt; font-family: Pretendard, sans-serif;',
             },
         },

@@ -167,12 +167,12 @@ def structure_toc_from_pages(text_content: str) -> Dict[str, Any]:
         Your task is to structure this into a clean, hierarchical JSON format.
         
         **CRITICAL INSTRUCTIONS:**
-        1. **Ignore RFP's own TOC**: If the text contains the RFP's document outline (e.g. "1. Project Overview... 2. Current Status..."), IGNORE IT. Only extract the structure required for the *Proposal Response*.
+        1. **Ignore RFP's own TOC**: If the text contains the RFP's document outline (e.g. "1. 제안요청서 개요... 2. 제안 안내사항... 3. 제안서 작성 지침...4.제안서 평가 방법"), IGNORE IT. Only extract the structure required for the *Proposal Response*.
         2. **Hierarchy**: transform the flat text into a nested structure (Chapter -> Sub-sections).
            - Big Chapters (e.g., I, II, III... or 1, 2, 3...) should be mapped to 'chapter_title'.
            - Sections under them (e.g., 1, 2, 3... or 가, 나, 다...) should be mapped to 'sub_sections' list with 'title'.
         3. **Guidelines**: If there are specific requirements or evaluation criteria associated with a section, include them in the 'guideline' field.
-        4. **Exhaustiveness**: Extract ALL chapters and sections found in the text. Do not skip any items.
+        4. **Exhaustiveness**: Extract ALL chapters and sections found in the text. Do not skip any items. 'chapter_title'이 적어도 3개 이상 되어야 함.
         
         {format_instructions}
         
