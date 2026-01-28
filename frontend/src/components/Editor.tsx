@@ -18,8 +18,10 @@ import {
     Bold, Italic, Underline as UnderlineIcon,
     AlignLeft, AlignCenter, AlignRight, AlignJustify,
     Type, Palette, Highlighter, ChevronDown,
-    List, ListOrdered, Heading1, Heading2, Heading3, ArrowUpDown
+    List, ListOrdered, Heading1, Heading2, Heading3, ArrowUpDown, Settings
 } from 'lucide-react';
+
+import { PaginationPlus } from 'tiptap-pagination-plus';
 
 // Custom Font Size Extension
 const FontSize = Extension.create({
@@ -188,6 +190,17 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
     const [showFontSizes, setShowFontSizes] = useState(false);
     const [showFontFamilies, setShowFontFamilies] = useState(false);
     const [showLineHeights, setShowLineHeights] = useState(false);
+    const [showHeaderFooterDialog, setShowHeaderFooterDialog] = useState(false);
+
+    const [headerLeft, setHeaderLeft] = useState('');
+    const [headerRight, setHeaderRight] = useState('');
+    const [footerLeft, setFooterLeft] = useState('');
+    const [footerRight, setFooterRight] = useState('{page}');
+
+    const [marginTop, setMarginTop] = useState('72');
+    const [marginBottom, setMarginBottom] = useState('72');
+    const [marginLeft, setMarginLeft] = useState('72');
+    const [marginRight, setMarginRight] = useState('72');
 
     const editor = useEditor({
         extensions: [
@@ -212,6 +225,15 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
             TableRow,
             TableHeader,
             TableCell,
+            PaginationPlus.configure({
+                pageHeight: 1123, // A4 Height
+                pageWidth: 794, // A4 Width
+                pageGap: 20,
+                headerLeft: "",
+                headerRight: "",
+                footerLeft: "",
+                footerRight: "{page}",
+            }),
         ],
         content: initialContent,
         immediatelyRender: false,
@@ -239,62 +261,24 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
         }
     }, [editor, initialContent]);
 
-    // Pagination logic
-    useEffect(() => {
+    const applyPageSetup = () => {
         if (!editor) return;
 
-        const checkPagination = () => {
-            const paper = document.getElementById(id || '');
-            if (!paper) return;
-
-            const contentArea = paper.querySelector('.ProseMirror');
-            if (!contentArea) return;
-
-            const PAGE_HEIGHT = 1123; // A4 height in pixels
-            const MARGIN_TOP = 75;
-            const MARGIN_BOTTOM = 75;
-
-            const blocks = Array.from(contentArea.children) as HTMLElement[];
-
-            // Reset all margins first
-            blocks.forEach(block => {
-                block.style.marginTop = '0px';
-                block.removeAttribute('data-page-break');
-            });
-
-            let currentY = MARGIN_TOP;
-
-            blocks.forEach((block) => {
-                const blockHeight = block.offsetHeight;
-                const style = window.getComputedStyle(block);
-                const marginBottom = parseInt(style.marginBottom || '0', 10);
-
-                const blockTop = currentY;
-                const blockBottom = currentY + blockHeight;
-
-                const pageIndex = Math.floor(blockTop / PAGE_HEIGHT);
-                const pageStart = pageIndex * PAGE_HEIGHT;
-                const validContentEnd = pageStart + PAGE_HEIGHT - MARGIN_BOTTOM;
-
-                if (blockBottom > validContentEnd) {
-                    const nextPageContentStart = (pageIndex + 1) * PAGE_HEIGHT + MARGIN_TOP;
-                    const spacer = nextPageContentStart - blockTop;
-
-                    if (spacer > 0) {
-                        block.style.marginTop = `${spacer}px`;
-                        block.setAttribute('data-page-break', 'true');
-                        currentY = nextPageContentStart + blockHeight + marginBottom;
-                        return;
-                    }
-                }
-
-                currentY += blockHeight + marginBottom;
-            });
+        const margins = {
+            top: Number(marginTop) || 50,
+            bottom: Number(marginBottom) || 50,
+            left: Number(marginLeft) || 50,
+            right: Number(marginRight) || 50
         };
 
-        const timeout = setTimeout(checkPagination, 500);
-        return () => clearTimeout(timeout);
-    }, [editor?.getHTML()]);
+        editor.chain().focus()
+            .updateHeaderContent(headerLeft, headerRight)
+            .updateFooterContent(footerLeft, footerRight)
+            .updateMargins(margins)
+            .run();
+
+        setShowHeaderFooterDialog(false);
+    };
 
     if (!editor) {
         return null;
@@ -323,7 +307,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
     return (
         <div className="flex flex-col gap-4 w-full max-w-[800px] mx-auto">
             {/* Toolbar */}
-            <div className="sticky top-20 z-50 border border-gray-200 p-1.5 flex flex-wrap gap-0.5 bg-white/80 backdrop-blur-md rounded-xl no-print shadow-sm border-gray-200">
+            <div className="sticky top-20 z-50 border p-1.5 flex flex-wrap gap-0.5 bg-white/80 backdrop-blur-md rounded-xl no-print shadow-sm border-gray-200">
                 {/* Font Family */}
                 <div className="relative">
                     <button
@@ -333,7 +317,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                         {FONT_FAMILIES.find(f => f.value === editor.getAttributes('textStyle').fontFamily)?.name || '기본(프리텐다드)'} <ChevronDown size={14} />
                     </button>
                     {showFontFamilies && (
-                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-[60] py-1 min-w-[120px]">
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-60 py-1 min-w-[120px]">
                             {FONT_FAMILIES.map((f) => (
                                 <button
                                     key={f.name}
@@ -360,7 +344,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                         {editor.getAttributes('textStyle').fontSize || '11pt'} <ChevronDown size={14} />
                     </button>
                     {showFontSizes && (
-                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-[60] py-1 min-w-[60px]">
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-60 py-1 min-w-[60px]">
                             {FONT_SIZES.map((size) => (
                                 <button
                                     key={size}
@@ -464,7 +448,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                         <ArrowUpDown size={18} />
                     </button>
                     {showLineHeights && (
-                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-[60] py-1 min-w-[180px]">
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-60 py-1 min-w-[180px]">
                             {LINE_HEIGHTS.map((lh) => (
                                 <button
                                     key={lh.value}
@@ -541,35 +525,141 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                 >
                     <ListOrdered size={18} />
                 </ToolbarButton>
+
+                <div className="w-px h-6 bg-gray-200 mx-1 self-center" />
+
+                {/* Header/Footer Settings */}
+                <div className="relative">
+                    <ToolbarButton
+                        onClick={() => setShowHeaderFooterDialog(!showHeaderFooterDialog)}
+                        isActive={showHeaderFooterDialog}
+                        title="Page Setup"
+                    >
+                        <Settings size={18} />
+                    </ToolbarButton>
+
+                    {showHeaderFooterDialog && (
+                        <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-60 p-4 w-[300px]">
+                            <h3 className="text-sm font-semibold mb-3 text-gray-900">페이지 설정</h3>
+
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">머리말 (좌측)</label>
+                                    <input
+                                        type="text"
+                                        value={headerLeft}
+                                        onChange={(e) => setHeaderLeft(e.target.value)}
+                                        className="w-full text-xs p-2 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                        placeholder="입력하세요..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">머리말 (우측)</label>
+                                    <input
+                                        type="text"
+                                        value={headerRight}
+                                        onChange={(e) => setHeaderRight(e.target.value)}
+                                        className="w-full text-xs p-2 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                        placeholder="Page {page}"
+                                    />
+                                </div>
+                                <div className="h-px bg-gray-100 my-2" />
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">꼬리말 (좌측)</label>
+                                    <input
+                                        type="text"
+                                        value={footerLeft}
+                                        onChange={(e) => setFooterLeft(e.target.value)}
+                                        className="w-full text-xs p-2 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                        placeholder="입력하세요..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">꼬리말 (우측)</label>
+                                    <input
+                                        type="text"
+                                        value={footerRight}
+                                        onChange={(e) => setFooterRight(e.target.value)}
+                                        className="w-full text-xs p-2 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                        placeholder="Page {page}"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="h-px bg-gray-100" />
+
+                            {/* Margins Section */}
+                            <div className="space-y-3">
+                                <h4 className="text-xs font-semibold text-gray-500 uppercase">여백 (px)</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 mb-1">위쪽</label>
+                                        <input
+                                            type="number"
+                                            value={marginTop}
+                                            onChange={(e) => setMarginTop(e.target.value)}
+                                            className="w-full text-xs p-1.5 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 mb-1">아래쪽</label>
+                                        <input
+                                            type="number"
+                                            value={marginBottom}
+                                            onChange={(e) => setMarginBottom(e.target.value)}
+                                            className="w-full text-xs p-1.5 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 mb-1">왼쪽</label>
+                                        <input
+                                            type="number"
+                                            value={marginLeft}
+                                            onChange={(e) => setMarginLeft(e.target.value)}
+                                            className="w-full text-xs p-1.5 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 mb-1">오른쪽</label>
+                                        <input
+                                            type="number"
+                                            value={marginRight}
+                                            onChange={(e) => setMarginRight(e.target.value)}
+                                            className="w-full text-xs p-1.5 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 flex justify-end gap-2">
+                                <button
+                                    onClick={() => setShowHeaderFooterDialog(false)}
+                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    onClick={applyPageSetup}
+                                    className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded shadow-sm"
+                                >
+                                    적용
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Paper */}
             <div
                 id={id}
-                className="editor-paper w-full bg-white border border-gray-200 shadow-[0_0_50px_rgba(0,0,0,0.1)] relative transition-all duration-300"
-                style={{
-                    minHeight: '1123px',
-                    padding: '20mm',
-                    boxSizing: 'border-box'
-                }}
+                className="editor-paper w-full bg-transparent relative mx-0"
             >
                 <EditorContent editor={editor} />
             </div>
 
             {/* Styles */}
             <style jsx>{`
-                .editor-paper {
-                    background-image: repeating-linear-gradient(
-                        to bottom,
-                        transparent 0px,
-                        transparent 1122px,
-                        #f1f5f9 1122px,
-                        #f1f5f9 1125px,
-                        transparent 1125px,
-                        transparent 1126px
-                    );
-                    background-position: 0 0; 
-                }
                 :global(.ProseMirror) {
                     outline: none;
                 }
@@ -621,7 +711,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                     pointer-events: none;
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 

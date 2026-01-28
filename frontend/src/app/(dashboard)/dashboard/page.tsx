@@ -89,21 +89,13 @@ export default function DashboardPage() {
         }
     };
 
-    const handleDownloadPdf = async (e: React.MouseEvent, proposal: Proposal) => {
+    const handleDownloadPdf = (e: React.MouseEvent, proposal: Proposal) => {
         e.preventDefault();
         e.stopPropagation();
-
-        if (isGeneratingPdf) return;
-
-        setIsGeneratingPdf(true);
-        try {
-            const { data: fullProposal } = await axios.get<Proposal>(`/api/proposals/${proposal.id}`);
-            setPdfTargetProposal(fullProposal);
-        } catch (error) {
-            console.error("Failed to fetch proposal for PDF", error);
-            setIsGeneratingPdf(false);
-            alert("제안서 내용을 불러오는데 실패했습니다.");
-        }
+        // For now, redirect to editor and let user print from there
+        // A dedicated print route could be added later
+        router.push(`/editor/${proposal.id}`);
+        // Optionally pass a query param ?print=true to auto-trigger print
     };
 
     // Effect to trigger PDF generation when pdfTargetProposal is set and rendered

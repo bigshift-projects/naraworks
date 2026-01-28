@@ -127,3 +127,47 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  @page {
+    margin: 0;
+    size: auto;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    background-color: white !important;
+  }
+
+  /* Hide everything by default, then show specific print content */
+  .no-print,
+  header,
+  aside,
+  .sidebar,
+  /* Assuming sidebar class */
+  button {
+    display: none !important;
+  }
+
+  /* Ensure editor content is visible and properly sized */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Target Tiptap editor specifically */
+  .ProseMirror {
+    min-height: auto !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Ensure background colors (like text highlights) are printed */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
