@@ -197,10 +197,10 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
     const [footerLeft, setFooterLeft] = useState('');
     const [footerRight, setFooterRight] = useState('{page}');
 
-    const [marginTop, setMarginTop] = useState('72');
-    const [marginBottom, setMarginBottom] = useState('72');
-    const [marginLeft, setMarginLeft] = useState('72');
-    const [marginRight, setMarginRight] = useState('72');
+    const [marginTop, setMarginTop] = useState(72);
+    const [marginBottom, setMarginBottom] = useState(72);
+    const [marginLeft, setMarginLeft] = useState(72);
+    const [marginRight, setMarginRight] = useState(72);
 
     const editor = useEditor({
         extensions: [
@@ -217,7 +217,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
             Highlight.configure({ multicolor: true }),
             FontFamily,
             FontSize,
-            LineHeight.configure({ types: ['heading', 'paragraph'], defaultLineHeight: '1.15' }),
+            LineHeight.configure({ types: ['heading', 'paragraph'], defaultLineHeight: '1.5' }),
             ParagraphSpacing,
             Table.configure({
                 resizable: true,
@@ -230,9 +230,19 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
                 pageWidth: 794, // A4 Width
                 pageGap: 20,
                 headerLeft: "",
+                //                 headerLeft: `<div>
+                // <h2 style="margin: 0; color: #1f2937;">Business Proposal</h2>
+                // <p style="margin: 0; font-size: 11px; color: #6b7280;">Proposal #2024-001</p>
+                // </div>`,
                 headerRight: "",
                 footerLeft: "",
                 footerRight: "{page}",
+                marginTop: 36,
+                marginBottom: 36,
+                marginLeft: 72,
+                marginRight: 72,
+                contentMarginTop: 10,
+                contentMarginBottom: 10,
             }),
         ],
         content: initialContent,
@@ -248,7 +258,7 @@ const Editor = ({ id, initialContent, onChange }: EditorProps) => {
         },
         editorProps: {
             attributes: {
-                class: 'prose max-w-none mx-auto focus:outline-none min-h-[500px] text-[11pt] leading-[1.5] text-gray-900',
+                class: 'prose max-w-none mx-auto focus:outline-none min-h-[500px] text-[11pt] leading-6 text-gray-900',
                 style: 'font-size: 11pt; font-family: Pretendard, sans-serif;',
             },
         },

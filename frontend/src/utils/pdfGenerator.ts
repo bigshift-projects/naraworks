@@ -12,6 +12,32 @@ export const generatePdf = async (elementId: string, filename: string) => {
         element.style.backgroundImage = 'none';
 
         // Capture as JPEG with 0.5 quality for better compression
+        // FIX: html-to-image doesn't capture CSS counters correctly (shows 0).
+        // We manually inject styles to force the correct numbers.
+        const pageNumbers = element.querySelectorAll('.rm-page-number');
+        const tempStyleId = 'pdf-export-styles';
+        let styleEl = document.getElementById(tempStyleId) as HTMLStyleElement;
+
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = tempStyleId;
+            document.head.appendChild(styleEl);
+        }
+
+        let cssRules = '';
+        pageNumbers.forEach((el, index) => {
+            const pageNum = index + 1;
+            const uniqueClass = `pdf-page-${pageNum}`;
+            el.classList.add(uniqueClass);
+            // Force the content to be the hardcoded page number
+            cssRules += `
+                .rm-page-number.${uniqueClass}::before {
+                    content: "${pageNum}" !important;
+                }
+            `;
+        });
+        styleEl.innerHTML = cssRules;
+
         const dataUrl = await toJpeg(element, {
             quality: 0.8,
             backgroundColor: '#ffffff',
@@ -25,6 +51,14 @@ export const generatePdf = async (elementId: string, filename: string) => {
                 backgroundImage: 'none',
             },
         });
+
+        // Cleanup: Remove temporary classes and style element
+        pageNumbers.forEach((el, index) => {
+            el.classList.remove(`pdf-page-${index + 1}`);
+        });
+        if (styleEl) {
+            styleEl.remove();
+        }
 
         // Restore page break lines
         element.style.backgroundImage = originalBackground;
@@ -47,7 +81,7 @@ export const generatePdf = async (elementId: string, filename: string) => {
             if (pageNumber > 0) {
                 pdf.addPage();
             }
-            // Position the image at (0,0) because margins are included in the image itself
+            // Position the image
             pdf.addImage(dataUrl, 'JPEG', 0, -position, imgWidth, imgHeight, undefined, 'FAST');
             position += pdfHeight;
             heightLeft -= pdfHeight;
